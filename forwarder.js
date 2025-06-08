@@ -22,7 +22,7 @@ class Forwarder {
       }
 
       // lance ffmpeg _avant_ de brancher l’audio
-      this.ffmpeg = new FFMPEG(this.args);
+      this.ffmpeg = new FFMPEG(this.args, this.logger);
 
       // rejoint le canal
       const connection = joinVoiceChannel({
@@ -37,7 +37,7 @@ class Forwarder {
       this.client.user.setActivity(this.args.listeningTo, { type: ActivityType.Listening });
 
       // créé un AudioReceiver qui enverra tout dans ffmpeg
-      const receiver = new AudioReceiver(this.ffmpeg, 48000);
+      const receiver = new AudioReceiver(this.ffmpeg, 48000, this.logger);
 
       // à chaque fois qu’un user parle, on pipe son flux Opus vers notre décodeur
       connection.receiver.speaking.on('start', userId => {
