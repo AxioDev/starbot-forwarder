@@ -10,7 +10,7 @@ class AudioReceiver {
     this.ffmpeg = ffmpegInstance;
     this.logger = logger;
 
-    // Décodeur Opus → PCM
+    // Transform stream pour passer de Opus → PCM s16le@48kHz stéréo
     this.decoder = new prism.opus.Decoder({ channels: 2, rate: inputSampleRate, frameSize: 960 });
 
     // À chaque data PCM, on forward à ffmpeg

@@ -10,7 +10,7 @@ program
     .version(getVersion(), '-V, --version', 'affiche la version')
     .requiredOption('-t, --token <token>', 'Le token du bot Discord')
     .requiredOption('-c, --channel-id <id>', 'L’ID du canal vocal à rejoindre')
-    .option('-r, --sample-rate <rate>', 'Sample rate de sortie (défaut 48000)', '48000')
+    .option('-r, --sample-rate <rate>', 'Sample rate de sortie (défaut 44100)', '44100')
     .option('-x, --compression-level <level>', 'Niveau de compression (défaut 0)', '0')
     .option('-d, --redirect-ffmpeg-output', 'Afficher stdout de ffmpeg')
     .option('-l, --listening-to <text>', 'Activité “Listening to” (défaut “you.”)', 'you.')
