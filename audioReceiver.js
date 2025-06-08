@@ -5,8 +5,9 @@ class AudioReceiver {
    * @param {FFMPEG} ffmpegInstance
    * @param {number} inputSampleRate  le sample-rate des paquets Opus (toujours 48000)
    */
-  constructor(ffmpegInstance, inputSampleRate) {
+  constructor(ffmpegInstance, inputSampleRate, logger) {
     this.ffmpeg = ffmpegInstance;
+    this.logger = logger;
     // Transform stream pour passer de Opus → PCM s16le@48kHz stéréo
     this.decoder = new prism.opus.Decoder({ channels: 2, rate: inputSampleRate, frameSize: 960 });
     this.decoder.on('data', chunk => {

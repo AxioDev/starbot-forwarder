@@ -17,6 +17,7 @@ class FFMPEG {
       'ffmpeg', '-hide_banner',
       '-f', 's16le', '-ac', '2', '-ar', '48000', '-i', 'pipe:0',
       '-ar', String(args.sampleRate),
+      '-ac', '2',
       '-c:a', 'libmp3lame',
       '-f', 'mp3'
     ];
