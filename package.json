@@ -1,0 +1,28 @@
+{
+  "name": "starbot-forwarder-1",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/AxioDev/starbot-forwarder#readme",
+  "bugs": {
+    "url": "https://github.com/AxioDev/starbot-forwarder/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AxioDev/starbot-forwarder.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@discordjs/opus": "^0.10.0",
+    "@discordjs/voice": "^0.18.0",
+    "commander": "^14.0.0",
+    "discord.js": "^14.19.3",
+    "prism-media": "^1.3.5",
+    "winston": "^3.17.0"
+  }
+}
