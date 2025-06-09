@@ -4,7 +4,8 @@ const AudioMixer = require('audio-mixer');
 class AudioReceiver {
   /**
    * @param {FFMPEG} ffmpegInstance
-   * @param {number} inputSampleRate  le sample-rate des paquets Opus (toujours 48000)
+   * @param {number} inputSampleRate
+   * @param {import('winston').Logger} logger
    */
   constructor(ffmpegInstance, inputSampleRate, logger) {
     this.ffmpeg = ffmpegInstance;
@@ -46,8 +47,6 @@ class AudioReceiver {
 
     this.inputs.set(userId, { decoder, input });
   }
-
-  
 }
 
 module.exports = AudioReceiver;

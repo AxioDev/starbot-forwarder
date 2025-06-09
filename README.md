@@ -1,34 +1,22 @@
-# Starbot Forwarder
 
-Ce bot Discord permet de recevoir l'audio d'un salon vocal et de le transmettre vers un serveur Icecast. Plusieurs utilisateurs peuvent parler en même temps : l'audio est mixé automatiquement.
+This Discord bot captures audio from a voice channel and forwards it to an Icecast server. Multiple users can speak at the same time: the audio is automatically mixed.
 
-## Utilisation
-
-```bash
-node index.js -t <token> -c <id_du_vocal> <url_icecast>
-```
-
-Si ces valeurs ne sont pas passées sur la ligne de commande, le programme
-essaiera de les lire depuis un fichier `.env` placé à la racine :
-
-```
-TOKEN=VOTRE_TOKEN
-CHANNEL_ID=ID_DU_VOCAL
-ICECAST_URL=icecast+http://source:motdepasse@example.com/stream
-```
-
-L'URL Icecast doit utiliser le protocole `icecast+http` ou `icecast+https` afin que ffmpeg établisse correctement la connexion. Exemple :
-
-```
-node index.js -t TOKEN -c CHANNEL_ID icecast+https://source:motdepasse@example.com/stream
-```
-
-Si l'URL commence uniquement par `http://` ou `https://`, le programme ajoutera automatiquement le préfixe `icecast+`.
-
-Par défaut, l'encodage MP3 se fait en 44.1 kHz. Si votre serveur Icecast ou votre lecteur nécessite un autre taux d'échantillonnage, utilisez l'option `--sample-rate` :
+## Usage
 
 ```bash
-node index.js -t TOKEN -c CHANNEL_ID --sample-rate 44100 icecast+http://source:motdepasse@example.com/stream
+node index.js -t <token> -c <voice_channel_id> <icecast_url>
 ```
 
-Créé par axio et fnord.
+The Icecast URL must use the `icecast+http` or `icecast+https` protocol so that ffmpeg can properly establish the connection. Example:
+
+```
+node index.js --token YOUR_TOKEN --channel-id VOICE_CHANNEL_ID icecast://source:password@example.org:8000/stream
+```
+
+If the URL only starts with `http://` or `https://`, the program will automatically add the `icecast+` prefix.
+
+By default, MP3 encoding is done at 44.1 kHz. If your Icecast server or player requires a different sample rate, use the `--sample-rate` option:
+
+```bash
+node index.js --token YOUR_TOKEN --channel-id VOICE_CHANNEL_ID icecast://source:password@example.org:8000/stream
+```
