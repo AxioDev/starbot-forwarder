@@ -1,11 +1,19 @@
+[variables]
+NIXPACKS_NODE_VERSION = "20"
+
 [phases.setup]
 nixPkgs = [
-  "python312",
-  "pkg-config",
-  "cairo",
-  "pango",
-  "libjpeg",
-  "pixman"
+  "python3",      # requis pour node-gyp
+  "gcc",          # compilateur
+  "gnumake",      # make
+  "ffmpeg",       # pour l’audio dans ton bot
+  "nodejs_20"     # pour être sûr que le bon Node est là
 ]
-aptPkgs = ['build-essential','libudev-dev']
-providers = ["ffmpeg", "node", "python"]
+
+[phases.build]
+cmds = [
+  "npm install"
+]
+
+[start]
+cmd = "node index.js"
