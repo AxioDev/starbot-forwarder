@@ -1,11 +1,11 @@
 [phases.setup]
-aptPkgs = ["ffmpeg", "python", "build-essential","libudev-dev"]
 nixPkgs = [
-  "python3",
+  "python312",
   "pkg-config",
   "cairo",
   "pango",
   "libjpeg",
   "pixman"
 ]
-providers = ["node", "python"]
+aptPkgs = ['build-essential','libudev-dev']
+providers = ["ffmpeg", "node", "python"]
