@@ -1,6 +1,5 @@
-providers = ["node", "python"]
 [phases.setup]
-aptPkgs = ["ffmpeg", "python"]
+aptPkgs = ["ffmpeg", "python", "build-essential","libudev-dev"]
 nixPkgs = [
   "python3",
   "pkg-config",
@@ -9,3 +8,4 @@ nixPkgs = [
   "libjpeg",
   "pixman"
 ]
+providers = ["node", "python"]
