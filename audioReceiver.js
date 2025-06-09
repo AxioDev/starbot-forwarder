@@ -1,4 +1,5 @@
 const prism = require('prism-media');
+const AudioMixer = require('audio-mixer');
 
 class AudioReceiver {
   /**
@@ -9,32 +10,44 @@ class AudioReceiver {
   constructor(ffmpegInstance, inputSampleRate, logger) {
     this.ffmpeg = ffmpegInstance;
     this.logger = logger;
+    this.inputSampleRate = inputSampleRate;
 
-    // Transform stream pour passer de Opus → PCM s16le@48kHz stéréo
-    this.decoder = new prism.opus.Decoder({ channels: 2, rate: inputSampleRate, frameSize: 960 });
-
-    // À chaque data PCM, on forward à ffmpeg
-    this.decoder.on('data', chunk => {
+    // Mixer pour combiner les flux de plusieurs utilisateurs
+    this.mixer = new AudioMixer.Mixer({
+      channels: 2,
+      bitDepth: 16,
+      sampleRate: this.inputSampleRate,
+      clearInterval: 250
+    });
+    this.mixer.on('data', chunk => {
       this.ffmpeg.giveAudio(chunk);
     });
 
-    // Handler d’erreur sur le décodeur
-    this.decoder.on('error', err => {
-      this.logger.error('Opus decoder error:', err);
-    });
+    this.inputs = new Map();
+
   }
 
   /**
    * Branche un flux Opus du receiver Discord sur le décodeur.
    * @param {ReadableStream<Buffer>} opusStream
    */
-  handleOpusStream(opusStream) {
-    // Aussi catcher les erreurs sur le stream Opus
-    opusStream.on('error', err => {
-      this.logger.error('Opus stream error:', err);
+  handleOpusStream(opusStream, userId) {
+    const decoder = new prism.opus.Decoder({ channels: 2, rate: this.inputSampleRate, frameSize: 960 });
+    const input = this.mixer.input({ channels: 2 });
+
+    decoder.on('data', chunk => input.write(chunk));
+    decoder.on('error', err => this.logger.error('Opus decoder error:', err));
+    opusStream.pipe(decoder);
+
+    opusStream.once('end', () => {
+      this.mixer.removeInput(input);
+      input.destroy();
+      decoder.destroy();
+      this.inputs.delete(userId);
     });
 
-    opusStream.pipe(this.decoder, { end: false });
+    this.inputs.set(userId, { decoder, input });
+
   }
 }
 

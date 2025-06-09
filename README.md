@@ -1,6 +1,8 @@
 # Starbot Forwarder
 
-Ce bot Discord permet de recevoir l'audio d'un salon vocal et de le transmettre vers un serveur Icecast.
+
+Ce bot Discord permet de recevoir l'audio d'un salon vocal et de le transmettre vers un serveur Icecast. Plusieurs utilisateurs peuvent parler en même temps : l'audio est mixé automatiquement.
+
 
 ## Utilisation
 
