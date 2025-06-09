@@ -1,4 +1,5 @@
 const { spawn } = require('child_process');
+const ffmpegPath = require('ffmpeg-static');
 
 class FFMPEG {
   /**
@@ -12,65 +13,79 @@ class FFMPEG {
   constructor(args, logger) {
     this.logger = logger;
 
-    // Construction de la commande ffmpeg
+    if (!args.outputGroup.icecastUrl && !args.outputGroup.path) {
+      throw new Error('❌ Aucun output spécifié (ni icecastUrl ni path).');
+    }
+
+    // Commande de base
     const cmd = [
-      'ffmpeg', '-hide_banner',
-      '-f', 's16le', '-ac', '2', '-ar', '48000', '-i', 'pipe:0',
+      ffmpegPath,
+      '-hide_banner',
+      '-f', 's16le',
+      '-ac', '2',
+      '-ar', '48000',
+      '-i', 'pipe:0',
       '-ar', String(args.sampleRate),
       '-ac', '2',
       '-c:a', 'libmp3lame',
       '-f', 'mp3'
     ];
 
+    // Niveau de compression
     if (args.compressionLevel > 0) {
       cmd.push('-b:a', `${args.compressionLevel}k`);
     }
 
+    // Sortie vers Icecast
     if (args.outputGroup.icecastUrl) {
       let url = args.outputGroup.icecastUrl;
       if (/^https?:\/\//.test(url) && !url.startsWith('icecast+')) {
         url = 'icecast+' + url;
       }
+
       cmd.push(
         '-reconnect_at_eof', '1',
-        '-reconnect_streamed',  '1',
-        '-reconnect',          '1',
-        '-reconnect_delay_max','1000',
-        '-content_type',       'audio/mpeg',
+        '-reconnect_streamed', '1',
+        '-reconnect', '1',
+        '-reconnect_delay_max', '1000',
+        '-content_type', 'audio/mpeg',
         url
       );
-    } else if (args.outputGroup.path) {
-      cmd.push(args.outputGroup.path);
-    } else {
-      throw new Error('Aucun output spécifié.');
     }
 
-    // Démarrage du process
+    // Sortie vers fichier local
+    else if (args.outputGroup.path) {
+      cmd.push(args.outputGroup.path);
+    }
+
+    this.logger.debug(`🎬 Commande FFMPEG: ${cmd.join(' ')}`);
+
+    // Lancement du process
     this.process = spawn(cmd[0], cmd.slice(1), {
       stdio: [
-        'pipe',
-        args.redirectFfmpegOutput ? 'inherit' : 'ignore',
-        'inherit'
+        'pipe', // stdin
+        args.redirectFfmpegOutput ? 'inherit' : 'ignore', // stdout
+        'inherit' // stderr
       ]
     });
 
-    // 1) Éviter le crash sur EPIPE
+    // Gestion des erreurs stdin
     this.process.stdin.on('error', err => {
       if (err.code === 'EPIPE') {
-        this.logger.warn('ffmpeg stdin: broken pipe (EPIPE), on ignore.');
+        this.logger.warn('⚠️ ffmpeg stdin: broken pipe (EPIPE), ignoré.');
       } else {
-        this.logger.error('ffmpeg stdin error:', err);
+        this.logger.error('❌ Erreur sur stdin ffmpeg :', err);
       }
     });
 
-    // 2) Log quand ffmpeg se ferme
+    // Log fermeture process
     this.process.on('close', (code, signal) => {
-      this.logger.info(`ffmpeg process closed (code=${code}, signal=${signal})`);
+      this.logger.info(`✅ ffmpeg terminé (code=${code}, signal=${signal})`);
     });
 
-    // 3) Rethrow sur échec de spawn
+    // Erreur au démarrage
     this.process.on('error', err => {
-      this.logger.error('Erreur lors du démarrage de ffmpeg:', err);
+      this.logger.error('❌ Erreur de spawn ffmpeg :', err);
       throw err;
     });
   }
@@ -82,11 +97,11 @@ class FFMPEG {
   giveAudio(buffer) {
     const ok = this.process.stdin.write(buffer);
     if (!ok) {
-      this.logger.debug('ffmpeg stdin buffer plein (backpressure)');
+      this.logger.debug('📉 Buffer ffmpeg plein (backpressure)');
     }
   }
 
-  /** Ferme proprement stdin de ffmpeg */
+  /** Ferme proprement ffmpeg */
   close() {
     this.process.stdin.end();
   }
