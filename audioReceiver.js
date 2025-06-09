@@ -24,6 +24,7 @@ class AudioReceiver {
     });
 
     this.inputs = new Map();
+
   }
 
   /**
@@ -46,6 +47,7 @@ class AudioReceiver {
     });
 
     this.inputs.set(userId, { decoder, input });
+
   }
 }
 

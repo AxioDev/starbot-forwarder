@@ -1,5 +1,4 @@
 const { spawn } = require('child_process');
-const ffmpegPath = require('ffmpeg-static');
 
 class FFMPEG {
   /**
@@ -13,18 +12,10 @@ class FFMPEG {
   constructor(args, logger) {
     this.logger = logger;
 
-    if (!args.outputGroup.icecastUrl && !args.outputGroup.path) {
-      throw new Error('❌ Aucun output spécifié (ni icecastUrl ni path).');
-    }
-
-    // Commande de base
+    // Construction de la commande ffmpeg
     const cmd = [
-      ffmpegPath,
-      '-hide_banner',
-      '-f', 's16le',
-      '-ac', '2',
-      '-ar', '48000',
-      '-i', 'pipe:0',
+      'ffmpeg', '-hide_banner',
+      '-f', 's16le', '-ac', '2', '-ar', '48000', '-i', 'pipe:0',
       '-ar', String(args.sampleRate),
       '-ac', '2',
       '-c:a', 'libmp3lame',
@@ -48,41 +39,38 @@ class FFMPEG {
         '-content_type',       'audio/mpeg',
         url
       );
-    }
-
-    // Sortie vers fichier local
-    else if (args.outputGroup.path) {
+    } else if (args.outputGroup.path) {
       cmd.push(args.outputGroup.path);
+    } else {
+      throw new Error('Aucun output spécifié.');
     }
 
-    this.logger.debug(`🎬 Commande FFMPEG: ${cmd.join(' ')}`);
-
-    // Lancement du process
+    // Démarrage du process
     this.process = spawn(cmd[0], cmd.slice(1), {
       stdio: [
-        'pipe', // stdin
-        args.redirectFfmpegOutput ? 'inherit' : 'ignore', // stdout
-        'inherit' // stderr
+        'pipe',
+        args.redirectFfmpegOutput ? 'inherit' : 'ignore',
+        'inherit'
       ]
     });
 
-    // Gestion des erreurs stdin
+    // 1) Éviter le crash sur EPIPE
     this.process.stdin.on('error', err => {
       if (err.code === 'EPIPE') {
-        this.logger.warn('⚠️ ffmpeg stdin: broken pipe (EPIPE), ignoré.');
+        this.logger.warn('ffmpeg stdin: broken pipe (EPIPE), on ignore.');
       } else {
-        this.logger.error('❌ Erreur sur stdin ffmpeg :', err);
+        this.logger.error('ffmpeg stdin error:', err);
       }
     });
 
-    // Log fermeture process
+    // 2) Log quand ffmpeg se ferme
     this.process.on('close', (code, signal) => {
-      this.logger.info(`✅ ffmpeg terminé (code=${code}, signal=${signal})`);
+      this.logger.info(`ffmpeg process closed (code=${code}, signal=${signal})`);
     });
 
-    // Erreur au démarrage
+    // 3) Rethrow sur échec de spawn
     this.process.on('error', err => {
-      this.logger.error('❌ Erreur de spawn ffmpeg :', err);
+      this.logger.error('Erreur lors du démarrage de ffmpeg:', err);
       throw err;
     });
   }
@@ -94,11 +82,11 @@ class FFMPEG {
   giveAudio(buffer) {
     const ok = this.process.stdin.write(buffer);
     if (!ok) {
-      this.logger.debug('📉 Buffer ffmpeg plein (backpressure)');
+      this.logger.debug('ffmpeg stdin buffer plein (backpressure)');
     }
   }
 
-  /** Ferme proprement ffmpeg */
+  /** Ferme proprement stdin de ffmpeg */
   close() {
     this.process.stdin.end();
   }
