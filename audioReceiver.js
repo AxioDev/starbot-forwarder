@@ -24,7 +24,6 @@ class AudioReceiver {
     });
 
     this.inputs = new Map();
-
   }
 
   /**
@@ -39,6 +38,7 @@ class AudioReceiver {
     decoder.on('error', err => this.logger.error('Opus decoder error:', err));
     opusStream.pipe(decoder);
 
+
     opusStream.once('end', () => {
       this.mixer.removeInput(input);
       input.destroy();
@@ -47,7 +47,6 @@ class AudioReceiver {
     });
 
     this.inputs.set(userId, { decoder, input });
-
   }
 }
 
