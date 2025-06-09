@@ -38,7 +38,6 @@ class AudioReceiver {
     decoder.on('error', err => this.logger.error('Opus decoder error:', err));
     opusStream.pipe(decoder);
 
-
     opusStream.once('end', () => {
       this.mixer.removeInput(input);
       input.destroy();

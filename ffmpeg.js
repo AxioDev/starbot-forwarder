@@ -31,24 +31,21 @@ class FFMPEG {
       '-f', 'mp3'
     ];
 
-    // Niveau de compression
     if (args.compressionLevel > 0) {
       cmd.push('-b:a', `${args.compressionLevel}k`);
     }
 
-    // Sortie vers Icecast
     if (args.outputGroup.icecastUrl) {
       let url = args.outputGroup.icecastUrl;
       if (/^https?:\/\//.test(url) && !url.startsWith('icecast+')) {
         url = 'icecast+' + url;
       }
-
       cmd.push(
         '-reconnect_at_eof', '1',
-        '-reconnect_streamed', '1',
-        '-reconnect', '1',
-        '-reconnect_delay_max', '1000',
-        '-content_type', 'audio/mpeg',
+        '-reconnect_streamed',  '1',
+        '-reconnect',          '1',
+        '-reconnect_delay_max','1000',
+        '-content_type',       'audio/mpeg',
         url
       );
     }
