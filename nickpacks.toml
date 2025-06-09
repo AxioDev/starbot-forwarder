@@ -1,0 +1,10 @@
+[phases.setup]
+aptPkgs = ["ffmpeg"]
+nixPkgs = [
+  "python3",
+  "pkg-config",
+  "cairo",
+  "pango",
+  "libjpeg",
+  "pixman"
+]
