@@ -1,6 +1,15 @@
 # Starbot Forwarder
 
 
+Si ces valeurs ne sont pas passées sur la ligne de commande, le programme
+essaiera de les lire depuis un fichier `.env` placé à la racine :
+
+```
+TOKEN=VOTRE_TOKEN
+CHANNEL_ID=ID_DU_VOCAL
+ICECAST_URL=icecast+http://source:motdepasse@example.com/stream
+```
+
 Ce bot Discord permet de recevoir l'audio d'un salon vocal et de le transmettre vers un serveur Icecast. Plusieurs utilisateurs peuvent parler en même temps : l'audio est mixé automatiquement.
 
 
