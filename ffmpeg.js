@@ -17,19 +17,27 @@ class FFMPEG {
       'ffmpeg', '-hide_banner',
       '-f', 's16le', '-ac', '2', '-ar', '48000', '-i', 'pipe:0',
       '-ar', String(args.sampleRate),
-      '-ac', String(args.compressionLevel),
+      '-ac', '2',
       '-c:a', 'libmp3lame',
       '-f', 'mp3'
     ];
 
+    if (args.compressionLevel > 0) {
+      cmd.push('-b:a', `${args.compressionLevel}k`);
+    }
+
     if (args.outputGroup.icecastUrl) {
+      let url = args.outputGroup.icecastUrl;
+      if (/^https?:\/\//.test(url) && !url.startsWith('icecast+')) {
+        url = 'icecast+' + url;
+      }
       cmd.push(
         '-reconnect_at_eof', '1',
         '-reconnect_streamed',  '1',
         '-reconnect',          '1',
         '-reconnect_delay_max','1000',
         '-content_type',       'audio/mpeg',
-        args.outputGroup.icecastUrl
+        url
       );
     } else if (args.outputGroup.path) {
       cmd.push(args.outputGroup.path);

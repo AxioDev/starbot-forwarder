@@ -37,13 +37,13 @@ class Forwarder {
       this.client.user.setActivity(this.args.listeningTo, { type: ActivityType.Listening });
 
       // créé un AudioReceiver qui enverra tout dans ffmpeg
-      const receiver = new AudioReceiver(this.ffmpeg, 48000);
+      const receiver = new AudioReceiver(this.ffmpeg, 48000, this.logger);
 
       // à chaque fois qu’un user parle, on pipe son flux Opus vers notre décodeur
       connection.receiver.speaking.on('start', userId => {
         this.logger.debug(`User ${userId} a commencé à parler`);
         const opusStream = connection.receiver.subscribe(userId, { mode: 'opus', end: { behavior: 'manual' } });
-        receiver.handleOpusStream(opusStream);
+        receiver.handleOpusStream(opusStream, userId);
       });
 
       this.logger.info('Canal vocal rejoint et forwarding démarré.');
