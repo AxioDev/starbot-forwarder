@@ -1,6 +1,8 @@
 # Starbot Forwarder
 
+
 Ce bot Discord permet de recevoir l'audio d'un salon vocal et de le transmettre vers un serveur Icecast. Plusieurs utilisateurs peuvent parler en même temps : l'audio est mixé automatiquement.
+
 
 ## Utilisation
 
@@ -15,6 +17,7 @@ node index.js -t TOKEN -c CHANNEL_ID icecast+https://source:motdepasse@example.c
 ```
 
 Si l'URL commence uniquement par `http://` ou `https://`, le programme ajoutera automatiquement le préfixe `icecast+`.
+
 
 Par défaut, l'encodage MP3 se fait en 44.1 kHz. Si votre serveur Icecast ou votre lecteur nécessite un autre taux d'échantillonnage, utilisez l'option `--sample-rate` :
 

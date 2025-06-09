@@ -22,7 +22,7 @@ class Forwarder {
       }
 
       // lance ffmpeg _avant_ de brancher l’audio
-      this.ffmpeg = new FFMPEG(this.args);
+      this.ffmpeg = new FFMPEG(this.args, this.logger);
 
       // rejoint le canal
       const connection = joinVoiceChannel({
