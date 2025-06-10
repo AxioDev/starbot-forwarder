@@ -1,6 +1,6 @@
 
 
-const { Client, ActivityType } = require('discord.js-selfbot-v13');
+const { Client, GatewayIntentBits } = require('discord.js');
 
 
 const { joinVoiceChannel } = require('@discordjs/voice');
@@ -17,13 +17,9 @@ class Forwarder {
         this.logger = logger;
         this.ffmpeg = null;
 
-        if (parseInt(process.env.SELF_BOT) == 1) {
-            this.client = new Client({});
-        } else {
-            this.client = new Client({
-                intents: [GatewayIntentBits.GuildVoiceStates]
-            });
-        }
+        this.client = new Client({
+            intents: [GatewayIntentBits.GuildVoiceStates]
+        });
 
         this.client.once('ready', async () => {
             this.logger.info(`✅ Connecté en tant que ${this.client.user.tag}`);
