@@ -16,6 +16,7 @@ class Forwarder {
         this.args = args;
         this.logger = logger;
         this.ffmpeg = null;
+        this.receiver = null;
 
         this.client = new Client({
             intents: [GatewayIntentBits.GuildVoiceStates]
@@ -41,13 +42,13 @@ class Forwarder {
                 });
 
                 // créé un AudioReceiver qui enverra tout dans ffmpeg
-                const receiver = new AudioReceiver(this.ffmpeg, 48000, this.logger);
+                this.receiver = new AudioReceiver(this.ffmpeg, 48000, this.logger);
 
                 // à chaque fois qu’un user parle, on pipe son flux Opus vers notre décodeur
                 connection.receiver.speaking.on('start', userId => {
                     this.logger.debug(`User ${userId} a commencé à parler`);
                     const opusStream = connection.receiver.subscribe(userId, { mode: 'opus', end: { behavior: 'manual' } });
-                    receiver.handleOpusStream(opusStream, userId);
+                    this.receiver.handleOpusStream(opusStream, userId);
                 });
 
                 connection.receiver.speaking.on('start', (userId) => {
@@ -56,7 +57,7 @@ class Forwarder {
                         mode: 'opus',
                         end: { behavior: 'manual' }
                     });
-                    receiver.handleOpusStream(opusStream, userId);
+                    this.receiver.handleOpusStream(opusStream, userId);
                 });
 
                 this.logger.info('🔊 Canal vocal rejoint, forwarding actif.');
@@ -71,6 +72,7 @@ class Forwarder {
     }
 
     close() {
+        if (this.receiver) this.receiver.close();
         if (this.ffmpeg) this.ffmpeg.close();
         if (this.client) this.client.destroy();
     }
