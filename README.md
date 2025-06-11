@@ -13,12 +13,16 @@ The Icecast URL must use the `icecast+http` or `icecast+https` protocol so that 
 node index.js --token YOUR_TOKEN --channel-id VOICE_CHANNEL_ID icecast://source:password@example.org:8000/stream
 ```
 
-### Restart via Railway webhook
+### Restart via Railway API
 
-You can restart your Railway container automatically when the Icecast stream goes down by passing the webhook URL with `--railway-webhook` or the `RAILWAY_WEBHOOK` environment variable. Obtain the Deploy Hook URL from your Railway project settings.
+If the stream becomes unreachable, the bot can restart the latest deployment of your Railway service using the public GraphQL API. Provide your API token and the identifiers of the project, environment and service using the corresponding options (or environment variables).
 
 ```bash
-node index.js --railway-webhook https://railway.app/project/<id>/deploy/webhook/... \ 
+node index.js \
+  --railway-token <token> \
+  --railway-project <projectId> \
+  --railway-environment <environmentId> \
+  --railway-service <serviceId> \
   -t YOUR_TOKEN -c VOICE_CHANNEL_ID icecast://source:password@example.org:8000/stream
 ```
 
