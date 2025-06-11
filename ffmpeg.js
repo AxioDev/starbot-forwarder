@@ -1,6 +1,7 @@
 const { spawn } = require('child_process');
+const EventEmitter = require('events');
 
-class FFMPEG {
+class FFMPEG extends EventEmitter {
   /**
    * @param {object} args
    * @param {number} args.sampleRate
@@ -10,9 +11,17 @@ class FFMPEG {
    * @param {import('winston').Logger} logger
    */
   constructor(args, logger) {
+    super();
     this.logger = logger;
+    this.args = args;
+    this.keepRunning = true;
 
-    // Construction de la commande ffmpeg
+    this.spawnProcess();
+  }
+
+  spawnProcess() {
+    const args = this.args;
+
     const cmd = [
       'ffmpeg', '-hide_banner',
       '-f', 's16le', '-ac', '2', '-ar', '48000', '-i', 'pipe:0',
@@ -63,9 +72,12 @@ class FFMPEG {
       }
     });
 
-    // 2) Log quand ffmpeg se ferme
+    // 2) Log quand ffmpeg se ferme et redémarrer si nécessaire
     this.process.on('close', (code, signal) => {
-      this.logger.info(`ffmpeg process closed (code=${code}, signal=${signal})`);
+      this.logger.warn(`ffmpeg process closed (code=${code}, signal=${signal})`);
+      if (this.keepRunning) {
+        setTimeout(() => this.spawnProcess(), 1000);
+      }
     });
 
     // 3) Rethrow sur échec de spawn
@@ -86,9 +98,14 @@ class FFMPEG {
     }
   }
 
-  /** Ferme proprement stdin de ffmpeg */
+  /** Ferme proprement ffmpeg et stoppe le redémarrage auto */
   close() {
-    this.process.stdin.end();
+    this.keepRunning = false;
+    if (this.process) {
+      this.process.removeAllListeners('close');
+      this.process.stdin.end();
+      this.process.kill('SIGTERM');
+    }
   }
 }
 

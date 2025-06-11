@@ -85,7 +85,9 @@ process.on('SIGINT', () => {
 });
 
 setInterval(async () => {
-    const status = await checkStream('https://radio.libre-antenne.xyz/stream');
+    if (!args.outputGroup.icecastUrl) return;
+    const url = args.outputGroup.icecastUrl.replace(/^icecast\+/, '');
+    const status = await checkStream(url);
     if (status === 404) {
         logger.warn('Stream inaccessible (404). Redémarrage.');
         restartForwarder();
