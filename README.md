@@ -13,6 +13,19 @@ The Icecast URL must use the `icecast+http` or `icecast+https` protocol so that 
 node index.js --token YOUR_TOKEN --channel-id VOICE_CHANNEL_ID icecast://source:password@example.org:8000/stream
 ```
 
+### Restart via Railway API
+
+If the stream becomes unreachable, the bot can restart the latest deployment of your Railway service using the public GraphQL API. Provide your API token and the identifiers of the project, environment and service using the corresponding options (or environment variables).
+
+```bash
+node index.js \
+  --railway-token <token> \
+  --railway-project <projectId> \
+  --railway-environment <environmentId> \
+  --railway-service <serviceId> \
+  -t YOUR_TOKEN -c VOICE_CHANNEL_ID icecast://source:password@example.org:8000/stream
+```
+
 If the URL only starts with `http://` or `https://`, the program will automatically add the `icecast+` prefix.
 
 By default, MP3 encoding is done at 44.1 kHz. If your Icecast server or player requires a different sample rate, use the `--sample-rate` option:

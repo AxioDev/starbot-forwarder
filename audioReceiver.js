@@ -41,6 +41,10 @@ class AudioReceiver {
    * @param {ReadableStream<Buffer>} opusStream
    */
   handleOpusStream(opusStream, userId) {
+    if (this.inputs.has(userId)) {
+      return;
+    }
+
     const decoder = new prism.opus.Decoder({ channels: 2, rate: this.inputSampleRate, frameSize: 960 });
     const input = this.mixer.input({ channels: 2 });
 
