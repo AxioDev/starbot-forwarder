@@ -2,6 +2,8 @@
 const { program } = require('commander');
 require('dotenv').config();
 const winston = require('winston');
+const http = require('http');
+const https = require('https');
 const Forwarder = require('./forwarder');
 const getVersion = require('./version');
 
@@ -48,17 +50,44 @@ const args = {
     }
 };
 
-(async () => {
-    try {
-        const forwarder = new Forwarder(args, logger);
-        logger.info('Forwarder démarré. CTRL-C pour quitter.');
-        process.on('SIGINT', () => {
-            logger.info('Arrêt en cours…');
-            forwarder.close();
-            process.exit(0);
+let forwarder;
+
+function startForwarder() {
+    forwarder = new Forwarder(args, logger);
+    logger.info('Forwarder démarré. CTRL-C pour quitter.');
+}
+
+function restartForwarder() {
+    logger.warn('Redémarrage du forwarder…');
+    if (forwarder) forwarder.close();
+    startForwarder();
+}
+
+function checkStream(url) {
+    return new Promise(resolve => {
+        const u = new URL(url);
+        const lib = u.protocol === 'https:' ? https : http;
+        const req = lib.request({ method: 'HEAD', hostname: u.hostname, path: u.pathname, port: u.port }, res => {
+            resolve(res.statusCode);
+            res.resume();
         });
-    } catch (e) {
-        logger.error('Erreur au démarrage :', e);
-        process.exit(1);
+        req.on('error', () => resolve(-1));
+        req.end();
+    });
+}
+
+startForwarder();
+
+process.on('SIGINT', () => {
+    logger.info('Arrêt en cours…');
+    if (forwarder) forwarder.close();
+    process.exit(0);
+});
+
+setInterval(async () => {
+    const status = await checkStream('https://radio.libre-antenne.xyz/stream');
+    if (status === 404) {
+        logger.warn('Stream inaccessible (404). Redémarrage.');
+        restartForwarder();
     }
-})();
+}, 60000);
