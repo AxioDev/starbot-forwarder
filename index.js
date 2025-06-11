@@ -17,6 +17,10 @@ program
     .option('-x, --compression-level <level>', 'Niveau de compression (défaut 0)', '0')
     .option('-d, --redirect-ffmpeg-output', 'Afficher stdout de ffmpeg')
     .option('-l, --listening-to <text>', 'Activité “Listening to” (défaut “you.”)', 'you.')
+    .option('--railway-token <token>', 'Token API Railway', process.env.RAILWAY_TOKEN)
+    .option('--railway-project <id>', 'ID du projet Railway', process.env.RAILWAY_PROJECT_ID)
+    .option('--railway-environment <id>', 'ID de l\'environnement Railway', process.env.RAILWAY_ENVIRONMENT_ID)
+    .option('--railway-service <id>', 'ID du service Railway', process.env.RAILWAY_SERVICE_ID)
     .argument('[icecastUrl]', 'URL Icecast de destination')
     .argument('[fileOutput]', 'Chemin de fichier local en alternative')
     .parse(process.argv);
@@ -47,6 +51,12 @@ const args = {
     outputGroup: {
         icecastUrl,
         path: fileOutput || null
+    },
+    railway: {
+        token: opts.railwayToken,
+        project: opts.railwayProject,
+        environment: opts.railwayEnvironment,
+        service: opts.railwayService
     }
 };
 
@@ -61,6 +71,42 @@ function restartForwarder() {
     logger.warn('Redémarrage du forwarder…');
     if (forwarder) forwarder.close();
     startForwarder();
+}
+
+async function triggerRailwayRestart(cfg) {
+    if (!cfg.token || !cfg.project || !cfg.environment || !cfg.service) return;
+    try {
+        const query = {
+            query: `query deployments($input: DeploymentsInput!) { deployments(first: 1, input: $input) { edges { node { id } } } }`,
+            variables: { input: { projectId: cfg.project, environmentId: cfg.environment, serviceId: cfg.service } }
+        };
+        let res = await fetch('https://backboard.railway.com/graphql/v2', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${cfg.token}`
+            },
+            body: JSON.stringify(query)
+        });
+        const data = await res.json();
+        const deploymentId = data?.data?.deployments?.edges?.[0]?.node?.id;
+        if (!deploymentId) {
+            logger.error('Railway: aucun déploiement actif trouvé');
+            return;
+        }
+        const mutation = { query: `mutation { deploymentRestart(id: "${deploymentId}") }` };
+        res = await fetch('https://backboard.railway.com/graphql/v2', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${cfg.token}`
+            },
+            body: JSON.stringify(mutation)
+        });
+        logger.info(`Railway restart status ${res.status}`);
+    } catch (err) {
+        logger.error(`Railway API error: ${err.message}`);
+    }
 }
 
 function checkStream(url) {
@@ -85,9 +131,12 @@ process.on('SIGINT', () => {
 });
 
 setInterval(async () => {
-    const status = await checkStream('https://radio.libre-antenne.xyz/stream');
+    if (!args.outputGroup.icecastUrl) return;
+    const url = args.outputGroup.icecastUrl.replace(/^icecast\+/, '');
+    const status = await checkStream(url);
     if (status === 404) {
         logger.warn('Stream inaccessible (404). Redémarrage.');
         restartForwarder();
+        triggerRailwayRestart(args.railway);
     }
 }, 60000);
