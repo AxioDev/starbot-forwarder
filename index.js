@@ -17,6 +17,7 @@ program
     .option('-x, --compression-level <level>', 'Niveau de compression (défaut 0)', '0')
     .option('-d, --redirect-ffmpeg-output', 'Afficher stdout de ffmpeg')
     .option('-l, --listening-to <text>', 'Activité “Listening to” (défaut “you.”)', 'you.')
+    .option('-w, --railway-webhook <url>', 'Webhook Railway pour redémarrer le container', process.env.RAILWAY_WEBHOOK)
     .argument('[icecastUrl]', 'URL Icecast de destination')
     .argument('[fileOutput]', 'Chemin de fichier local en alternative')
     .parse(process.argv);
@@ -47,7 +48,8 @@ const args = {
     outputGroup: {
         icecastUrl,
         path: fileOutput || null
-    }
+    },
+    railwayWebhook: opts.railwayWebhook
 };
 
 let forwarder;
@@ -61,6 +63,18 @@ function restartForwarder() {
     logger.warn('Redémarrage du forwarder…');
     if (forwarder) forwarder.close();
     startForwarder();
+}
+
+function triggerRailwayWebhook(url) {
+    if (!url) return;
+    const u = new URL(url);
+    const lib = u.protocol === 'https:' ? https : http;
+    const req = lib.request(url, { method: 'POST' }, res => {
+        logger.info(`Webhook Railway: status ${res.statusCode}`);
+        res.resume();
+    });
+    req.on('error', err => logger.error(`Webhook Railway error: ${err.message}`));
+    req.end();
 }
 
 function checkStream(url) {
@@ -85,9 +99,12 @@ process.on('SIGINT', () => {
 });
 
 setInterval(async () => {
-    const status = await checkStream('https://radio.libre-antenne.xyz/stream');
+    if (!args.outputGroup.icecastUrl) return;
+    const url = args.outputGroup.icecastUrl.replace(/^icecast\+/, '');
+    const status = await checkStream(url);
     if (status === 404) {
         logger.warn('Stream inaccessible (404). Redémarrage.');
         restartForwarder();
+        triggerRailwayWebhook(args.railwayWebhook);
     }
 }, 60000);
