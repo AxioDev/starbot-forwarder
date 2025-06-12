@@ -32,7 +32,8 @@ class AudioReceiver {
     this.noiseInterval = setInterval(() => {
       const buf = Buffer.alloc(samples * 2 * 2);
       for (let i = 0; i < samples * 2; i++) {
-        const val = Math.floor((Math.random() * 2 - 1) * 500);
+        // White noise amplitude kept low so that it is barely audible
+        const val = Math.floor((Math.random() * 2 - 1) * 100);
         buf.writeInt16LE(val, i * 2);
       }
       this.noiseInput.write(buf);
