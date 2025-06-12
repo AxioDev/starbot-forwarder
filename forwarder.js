@@ -3,7 +3,7 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 
 
-const { joinVoiceChannel, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
+const { createAudioPlayer, createAudioResource, StreamType, joinVoiceChannel, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
 const FFMPEG = require('./ffmpeg');
 const AudioReceiver = require('./audioReceiver');
 
@@ -19,6 +19,7 @@ class Forwarder {
         this.receiver = null;
         this.connection = null;
         this.channel = null;
+        this.audioPlayer = createAudioPlayer();
 
         this.client = new Client({
             intents: [GatewayIntentBits.GuildVoiceStates]
@@ -55,6 +56,7 @@ class Forwarder {
             selfMute: false,
             selfDeaf: false
         });
+        this.connection.subscribe(this.audioPlayer);
 
         this.connection.on(VoiceConnectionStatus.Disconnected, async () => {
             this.logger.warn('🔌 Déconnecté du vocal, reconnexion…');
@@ -84,6 +86,11 @@ class Forwarder {
 
         this.logger.info('🔊 Canal vocal rejoint, forwarding actif.');
     }
+    playStream(readable) {
+        const resource = createAudioResource(readable, { inputType: StreamType.WebmOpus });
+        this.audioPlayer.play(resource);
+    }
+
 
     close() {
         if (this.receiver) this.receiver.close();

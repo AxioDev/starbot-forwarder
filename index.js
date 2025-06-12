@@ -6,6 +6,7 @@ const http = require('http');
 const https = require('https');
 const Forwarder = require('./forwarder');
 const getVersion = require('./version');
+const startWebServer = require("./webServer");
 
 program
     .name('node index.js')
@@ -22,6 +23,8 @@ program
     .option('--railway-project <id>', 'ID du projet Railway', process.env.RAILWAY_PROJECT_ID)
     .option('--railway-environment <id>', 'ID de l\'environnement Railway', process.env.RAILWAY_ENVIRONMENT_ID)
     .option('--railway-service <id>', 'ID du service Railway', process.env.RAILWAY_SERVICE_ID)
+    .option('--web', 'Expose une page web pour parler', process.env.WEB === 'true')
+    .option('--web-port <port>', 'Port du serveur web (défaut 3000)', process.env.WEB_PORT || '3000')
     .argument('[icecastUrl]', 'URL Icecast de destination')
     .argument('[fileOutput]', 'Chemin de fichier local en alternative')
     .parse(process.argv);
@@ -50,6 +53,8 @@ const args = {
     minBitrate: opts.minBitrate ? parseInt(opts.minBitrate, 10) : 1,
     redirectFfmpegOutput: !!opts.redirectFfmpegOutput,
     listeningTo: opts.listeningTo,
+    web: opts.web,
+    webPort: parseInt(opts.webPort, 10),
     outputGroup: {
         icecastUrl,
         path: fileOutput || null
@@ -73,6 +78,7 @@ function restartForwarder() {
     logger.warn('Redémarrage du forwarder…');
     if (forwarder) forwarder.close();
     startForwarder();
+    if (args.web) startWebServer(forwarder, args.webPort, logger);
 }
 
 async function triggerRailwayRestart(cfg) {
@@ -125,6 +131,7 @@ function checkStream(url) {
 }
 
 startForwarder();
+if (args.web) startWebServer(forwarder, args.webPort, logger);
 
 process.on('SIGINT', () => {
     logger.info('Arrêt en cours…');
