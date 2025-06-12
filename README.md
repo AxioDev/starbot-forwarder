@@ -45,3 +45,13 @@ node index.js --min-bitrate 2 --token YOUR_TOKEN --channel-id VOICE_CHANNEL_ID i
 The white-noise generator in `audioReceiver.js` writes very low-level samples
 (amplitude around `±100`). Adjust this constant if you need the noise to be
 more or less audible.
+
+## Web voice relay
+
+Use the `--web` option (or set `WEB=true` in your `.env` file) to expose a small web page that captures your microphone and relays it to Discord. The server listens on port 3000 by default. Override it with `--web-port` or the `WEB_PORT` environment variable.
+
+```bash
+node index.js --web --web-port 3000 -t YOUR_TOKEN -c VOICE_CHANNEL_ID icecast://source:password@example.org:8000/stream
+```
+
+Open `http://localhost:3000` in your browser, allow microphone access and start speaking. When the page is served over HTTPS it automatically upgrades to a secure `wss://` WebSocket. The page uses [Tailwind CSS](https://tailwindcss.com/) so it should look good on both desktop and mobile and includes a small inline favicon to avoid 404 errors.
