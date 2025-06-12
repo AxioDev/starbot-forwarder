@@ -41,3 +41,7 @@ Use `--min-bitrate` to override this value if needed:
 ```bash
 node index.js --min-bitrate 2 --token YOUR_TOKEN --channel-id VOICE_CHANNEL_ID icecast://source:password@example.org:8000/stream
 ```
+
+The white-noise generator in `audioReceiver.js` writes very low-level samples
+(amplitude around `±100`). Adjust this constant if you need the noise to be
+more or less audible.
