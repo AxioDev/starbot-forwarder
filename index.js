@@ -15,6 +15,7 @@ program
     .requiredOption('-c, --channel-id <id>', 'L’ID du canal vocal à rejoindre', process.env.CHANNEL_ID)
     .option('-r, --sample-rate <rate>', 'Sample rate de sortie (défaut 44100)', '44100')
     .option('-x, --compression-level <level>', 'Niveau de compression (défaut 0)', '0')
+    .option('--min-bitrate <kbit>', 'Bitrate minimal pour l\'encodage MP3 en kb/s (défaut 1)')
     .option('-d, --redirect-ffmpeg-output', 'Afficher stdout de ffmpeg')
     .option('-l, --listening-to <text>', 'Activité “Listening to” (défaut “you.”)', 'you.')
     .option('--railway-token <token>', 'Token API Railway', process.env.RAILWAY_TOKEN)
@@ -46,6 +47,7 @@ const args = {
     channelId: opts.channelId,
     sampleRate: parseInt(opts.sampleRate, 10),
     compressionLevel: parseInt(opts.compressionLevel, 10),
+    minBitrate: opts.minBitrate ? parseInt(opts.minBitrate, 10) : 1,
     redirectFfmpegOutput: !!opts.redirectFfmpegOutput,
     listeningTo: opts.listeningTo,
     outputGroup: {
