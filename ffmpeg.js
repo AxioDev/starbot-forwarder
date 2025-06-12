@@ -5,8 +5,9 @@ class FFMPEG extends EventEmitter {
   /**
    * @param {object} args
    * @param {number} args.sampleRate
-   * @param {number} args.compressionLevel
-   * @param {boolean} args.redirectFfmpegOutput
+  * @param {number} args.compressionLevel
+  * @param {number|null} [args.minBitrate]
+  * @param {boolean} args.redirectFfmpegOutput
    * @param {{ icecastUrl: string|null, path: string|null }} args.outputGroup
    * @param {import('winston').Logger} logger
    */
@@ -30,6 +31,10 @@ class FFMPEG extends EventEmitter {
       '-c:a', 'libmp3lame',
       '-f', 'mp3'
     ];
+
+    if (args.minBitrate) {
+      cmd.push('-minrate', `${args.minBitrate}k`);
+    }
 
     if (args.compressionLevel > 0) {
       cmd.push('-b:a', `${args.compressionLevel}k`);

@@ -33,3 +33,11 @@ By default, MP3 encoding is done at 44.1 kHz. If your Icecast server or player r
 ```bash
 node index.js --token YOUR_TOKEN --channel-id VOICE_CHANNEL_ID icecast://source:password@example.org:8000/stream
 ```
+
+To avoid Icecast closing the connection during silence, a small white-noise bed
+is mixed in and a minimal bitrate of **1&nbsp;kbit/s** is enforced by default.
+Use `--min-bitrate` to override this value if needed:
+
+```bash
+node index.js --min-bitrate 2 --token YOUR_TOKEN --channel-id VOICE_CHANNEL_ID icecast://source:password@example.org:8000/stream
+```

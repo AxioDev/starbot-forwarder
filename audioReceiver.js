@@ -25,13 +25,17 @@ class AudioReceiver {
 
     this.inputs = new Map();
 
-    // Input de silence pour garder le flux actif
-    this.silenceInput = this.mixer.input({ channels: 2, clearInterval: 250 });
+    // Input de bruit blanc léger pour garder le flux actif
+    this.noiseInput = this.mixer.input({ channels: 2, clearInterval: 250 });
     const frameDurationMs = 20;
     const samples = this.inputSampleRate * frameDurationMs / 1000;
-    this.silenceChunk = Buffer.alloc(samples * 2 * 2); // 16-bit stereo
-    this.silenceInterval = setInterval(() => {
-      this.silenceInput.write(this.silenceChunk);
+    this.noiseInterval = setInterval(() => {
+      const buf = Buffer.alloc(samples * 2 * 2);
+      for (let i = 0; i < samples * 2; i++) {
+        const val = Math.floor((Math.random() * 2 - 1) * 500);
+        buf.writeInt16LE(val, i * 2);
+      }
+      this.noiseInput.write(buf);
     }, frameDurationMs);
 
   }
@@ -63,11 +67,11 @@ class AudioReceiver {
 
   }
 
-  /** Stoppe le générateur de silence et nettoie le mixer */
+  /** Stoppe le générateur de bruit et nettoie le mixer */
   close() {
-    clearInterval(this.silenceInterval);
-    this.mixer.removeInput(this.silenceInput);
-    this.silenceInput.destroy();
+    clearInterval(this.noiseInterval);
+    this.mixer.removeInput(this.noiseInput);
+    this.noiseInput.destroy();
   }
 }
 
