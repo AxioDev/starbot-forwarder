@@ -54,4 +54,5 @@ Use the `--web` option (or set `WEB=true` in your `.env` file) to expose a small
 node index.js --web --web-port 3000 -t YOUR_TOKEN -c VOICE_CHANNEL_ID icecast://source:password@example.org:8000/stream
 ```
 
-Open `http://localhost:3000` in your browser, allow microphone access and start speaking. The page uses [Tailwind CSS](https://tailwindcss.com/) so it should look good on both desktop and mobile.
+Open `http://localhost:3000` in your browser, allow microphone access and start speaking. When the page is served over HTTPS it automatically upgrades to a secure `wss://` WebSocket. The page uses [Tailwind CSS](https://tailwindcss.com/) so it should look good on both desktop and mobile and includes a small inline favicon to avoid 404 errors.
+
