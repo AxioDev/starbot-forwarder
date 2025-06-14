@@ -58,3 +58,4 @@ Open `http://localhost:3000` in your browser, allow microphone access and start 
 
 The interface now has a darker gaming theme and includes an audio player that autoplays the radio stream available at `https://radio.libre-antenne.xyz/stream`. You can listen to this stream while speaking anonymously.
 The start and stop buttons now reflect the current state so it is clear when your microphone is live.
+
