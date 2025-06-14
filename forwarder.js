@@ -35,6 +35,24 @@ class Forwarder {
             }
         });
 
+        this.client.on('voiceStateUpdate', async (oldState, newState) => {
+            if (newState.id !== this.client.user.id) return;
+            if (newState.channelId === this.args.channelId) return;
+
+            this.logger.warn('🔄 Changement de salon détecté, reconnexion au salon cible…');
+            try {
+                if (this.connection) {
+                    this.connection.destroy();
+                }
+            } catch {}
+
+            try {
+                await this.connectToVoice();
+            } catch (err) {
+                this.logger.error(`❌ Erreur lors de la reconnexion : ${err.message}`);
+            }
+        });
+
         this.client.login(this.args.token).catch(err => {
             this.logger.error(`❌ Échec de connexion Discord : ${err.message}`);
         });
