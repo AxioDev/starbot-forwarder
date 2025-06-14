@@ -2,7 +2,8 @@ let ws;
 let recorder;
 
 async function start() {
-  ws = new WebSocket(`ws://${location.host}`);
+  const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${protocol}://${location.host}`);
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
   recorder.ondataavailable = e => { if (ws.readyState === 1) ws.send(e.data); };
