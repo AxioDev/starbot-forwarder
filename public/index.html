@@ -3,15 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Chat vocal anonyme</title>
+  <title>Libre antenne</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
-  <div class="bg-white rounded shadow p-6 w-full max-w-md text-center">
-    <h1 class="text-2xl font-bold mb-4">Parler anonymement</h1>
+<body class="bg-gradient-to-b from-gray-900 to-black text-green-400 font-mono flex items-center justify-center min-h-screen p-4" style="font-family: 'Press Start 2P', monospace;">
+  <div class="bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-md text-center">
+    <h1 class="text-2xl mb-6">Libre antenne</h1>
+    <audio class="w-full mb-6" controls autoplay crossorigin="anonymous" src="https://radio.libre-antenne.xyz/stream"></audio>
     <div class="space-x-4">
-      <button id="start" class="px-4 py-2 bg-blue-600 text-white rounded">Démarrer</button>
-      <button id="stop" class="px-4 py-2 bg-gray-300 text-gray-700 rounded">Arrêter</button>
+      <button id="start" class="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded">Parler</button>
+      <button id="stop" class="px-4 py-2 bg-gray-700 text-white rounded opacity-50 cursor-not-allowed" disabled>Stop</button>
     </div>
   </div>
   <script src="app.js"></script>
