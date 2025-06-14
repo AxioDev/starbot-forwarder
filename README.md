@@ -55,3 +55,5 @@ node index.js --web --web-port 3000 -t YOUR_TOKEN -c VOICE_CHANNEL_ID icecast://
 ```
 
 Open `http://localhost:3000` in your browser, allow microphone access and start speaking. The page uses [Tailwind CSS](https://tailwindcss.com/) so it should look good on both desktop and mobile.
+
+The interface now has a darker gaming theme and includes an audio player that autoplays the radio stream available at `https://radio.libre-antenne.xyz/stream`. You can listen to this stream while speaking anonymously.
