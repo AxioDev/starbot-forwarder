@@ -3,7 +3,7 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 
 
-const { createAudioPlayer, createAudioResource, StreamType, joinVoiceChannel, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
+const { createAudioPlayer, createAudioResource, joinVoiceChannel, VoiceConnectionStatus, entersState, demuxProbe } = require('@discordjs/voice');
 const FFMPEG = require('./ffmpeg');
 const AudioReceiver = require('./audioReceiver');
 
@@ -105,8 +105,12 @@ class Forwarder {
         this.logger.info('🔊 Canal vocal rejoint, forwarding actif.');
     }
     playStream(readable) {
-        const resource = createAudioResource(readable, { inputType: StreamType.WebmOpus });
-        this.audioPlayer.play(resource);
+        demuxProbe(readable)
+            .then(({ stream, type }) => {
+                const resource = createAudioResource(stream, { inputType: type });
+                this.audioPlayer.play(resource);
+            })
+            .catch(err => this.logger.error('Error probing audio stream:', err));
     }
 
 
