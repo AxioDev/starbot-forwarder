@@ -19,6 +19,7 @@ class Forwarder {
         this.receiver = null;
         this.connection = null;
         this.channel = null;
+        this.reconnectInterval = null;
         this.audioPlayer = createAudioPlayer();
 
         this.client = new Client({
@@ -30,6 +31,7 @@ class Forwarder {
 
             try {
                 await this.connectToVoice();
+                this.startAutoReconnect();
             } catch (err) {
                 this.logger.error(`❌ Erreur lors de la connexion au canal : ${err.message}`);
             }
@@ -48,6 +50,7 @@ class Forwarder {
 
             try {
                 await this.connectToVoice();
+                this.startAutoReconnect();
             } catch (err) {
                 this.logger.error(`❌ Erreur lors de la reconnexion : ${err.message}`);
             }
@@ -103,6 +106,27 @@ class Forwarder {
         });
 
         this.logger.info('🔊 Canal vocal rejoint, forwarding actif.');
+        this.startAutoReconnect();
+    }
+
+    startAutoReconnect() {
+        if (this.reconnectInterval) clearInterval(this.reconnectInterval);
+        this.reconnectInterval = setInterval(async () => {
+            const needsReconnect = !this.connection ||
+                this.connection.state.status === VoiceConnectionStatus.Destroyed ||
+                (this.connection.joinConfig && this.connection.joinConfig.channelId !== this.args.channelId);
+            if (needsReconnect) {
+                this.logger.warn('🔄 Reconnexion automatique au salon vocal…');
+                try {
+                    if (this.connection) {
+                        try { this.connection.destroy(); } catch {}
+                    }
+                    await this.connectToVoice();
+                } catch (err) {
+                    this.logger.error(`❌ Reconnexion automatique échouée : ${err.message}`);
+                }
+            }
+        }, 3000);
     }
     playStream(readable) {
         demuxProbe(readable)
@@ -119,6 +143,7 @@ class Forwarder {
         if (this.ffmpeg) this.ffmpeg.close();
         if (this.connection) this.connection.destroy();
         if (this.client) this.client.destroy();
+        if (this.reconnectInterval) clearInterval(this.reconnectInterval);
     }
 }
 
