@@ -12,7 +12,8 @@
 <body class="bg-gradient-to-b from-gray-900 to-black text-green-400 font-mono flex items-center justify-center min-h-screen p-4" style="font-family: 'Press Start 2P', monospace;">
   <div class="bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-md text-center">
     <h1 class="text-2xl mb-6">Libre antenne</h1>
-    <audio class="w-full mb-6" controls autoplay  src="https://radio.libre-antenne.xyz/stream"></audio>
+    <audio id="audio" class="w-full mb-4" controls autoplay src="https://radio.libre-antenne.xyz/stream"></audio>
+    <input id="volume" type="range" min="0" max="1" step="0.01" value="1" class="w-full h-1 mb-6 bg-gray-700 rounded-lg accent-green-500 cursor-pointer" />
     <div class="space-x-4">
       <button id="start" class="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded">Parler</button>
       <button id="stop" class="px-4 py-2 bg-gray-700 text-white rounded opacity-50 cursor-not-allowed" disabled>Stop</button>
