@@ -2,6 +2,14 @@ let ws;
 let recorder;
 const startBtn = document.getElementById('start');
 const stopBtn = document.getElementById('stop');
+const audio = document.getElementById('audio');
+const volume = document.getElementById('volume');
+
+if (volume && audio) {
+  volume.addEventListener('input', () => {
+    audio.volume = volume.value;
+  });
+}
 
 function updateButtons(isRecording) {
   if (isRecording) {
