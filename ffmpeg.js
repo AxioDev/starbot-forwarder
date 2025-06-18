@@ -26,6 +26,7 @@ class FFMPEG extends EventEmitter {
     const cmd = [
       'ffmpeg', '-hide_banner',
       '-f', 's16le', '-ac', '2', '-ar', '48000', '-i', 'pipe:0',
+      '-filter:a', 'volume=2',
       '-ar', String(args.sampleRate),
       '-ac', '2',
       '-c:a', 'libmp3lame',
