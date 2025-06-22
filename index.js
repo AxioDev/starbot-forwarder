@@ -19,6 +19,7 @@ program
     .option('--min-bitrate <kbit>', 'Bitrate minimal pour l\'encodage MP3 en kb/s (défaut 1)')
     .option('-d, --redirect-ffmpeg-output', 'Afficher stdout de ffmpeg')
     .option('-l, --listening-to <text>', 'Activité “Listening to” (défaut “you.”)', 'you.')
+    .option('-v, --volume <multiplier>', 'Multiplicateur de volume (défaut 3)', process.env.VOLUME || '3')
     .option('--railway-token <token>', 'Token API Railway', process.env.RAILWAY_TOKEN)
     .option('--railway-project <id>', 'ID du projet Railway', process.env.RAILWAY_PROJECT_ID)
     .option('--railway-environment <id>', 'ID de l\'environnement Railway', process.env.RAILWAY_ENVIRONMENT_ID)
@@ -51,6 +52,7 @@ const args = {
     sampleRate: parseInt(opts.sampleRate, 10),
     compressionLevel: parseInt(opts.compressionLevel, 10),
     minBitrate: opts.minBitrate ? parseInt(opts.minBitrate, 10) : 1,
+    volume: parseFloat(opts.volume),
     redirectFfmpegOutput: !!opts.redirectFfmpegOutput,
     listeningTo: opts.listeningTo,
     web: opts.web,
