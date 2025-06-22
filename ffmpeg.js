@@ -6,6 +6,7 @@ class FFMPEG extends EventEmitter {
    * @param {object} args
    * @param {number} args.sampleRate
   * @param {number} args.compressionLevel
+  * @param {number} args.volume
   * @param {number|null} [args.minBitrate]
   * @param {boolean} args.redirectFfmpegOutput
    * @param {{ icecastUrl: string|null, path: string|null }} args.outputGroup
@@ -26,7 +27,7 @@ class FFMPEG extends EventEmitter {
     const cmd = [
       'ffmpeg', '-hide_banner',
       '-f', 's16le', '-ac', '2', '-ar', '48000', '-i', 'pipe:0',
-      '-filter:a', 'volume=2',
+      '-filter:a', `volume=${args.volume}`,
       '-ar', String(args.sampleRate),
       '-ac', '2',
       '-c:a', 'libmp3lame',
