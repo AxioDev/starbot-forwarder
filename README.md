@@ -1,5 +1,5 @@
 
-This Discord bot captures audio from a voice channel and forwards it to an Icecast server. Multiple users can speak at the same time: the audio is automatically mixed.
+This Discord bot captures audio from a voice channel and forwards it to an Icecast server. Multiple users can speak at the same time: the audio is automatically mixed. If the bot is kicked from the voice channel, it will reconnect automatically after **30&nbsp;minutes**.
 
 ## Usage 
 

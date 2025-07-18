@@ -20,6 +20,8 @@ class Forwarder {
         this.connection = null;
         this.channel = null;
         this.reconnectInterval = null;
+        this.reconnectBlockedUntil = 0;
+        this.manualDisconnect = false;
         this.audioPlayer = createAudioPlayer();
 
         this.client = new Client({
@@ -40,19 +42,17 @@ class Forwarder {
         this.client.on('voiceStateUpdate', async (oldState, newState) => {
             if (newState.id !== this.client.user.id) return;
             if (newState.channelId === this.args.channelId) return;
+            if (this.manualDisconnect) { this.manualDisconnect = false; return; }
 
-            this.logger.warn('🔄 Changement de salon détecté, reconnexion au salon cible…');
-            try {
-                if (this.connection) {
-                    this.connection.destroy();
-                }
-            } catch {}
-
-            try {
-                await this.connectToVoice();
-                this.startAutoReconnect();
-            } catch (err) {
-                this.logger.error(`❌ Erreur lors de la reconnexion : ${err.message}`);
+            if (oldState.channelId === this.args.channelId) {
+                this.reconnectBlockedUntil = Date.now() + 30 * 60 * 1000;
+                this.logger.warn('❌ Expulsé du vocal. Reconnexion prévue dans 30 minutes.');
+                try {
+                    if (this.connection) {
+                        this.manualDisconnect = true;
+                        this.connection.destroy();
+                    }
+                } catch {}
             }
         });
 
@@ -80,6 +80,10 @@ class Forwarder {
         this.connection.subscribe(this.audioPlayer);
 
         this.connection.on(VoiceConnectionStatus.Disconnected, async () => {
+            if (this.reconnectBlockedUntil && Date.now() < this.reconnectBlockedUntil) {
+                this.logger.warn('🔌 Déconnecté du vocal. Attente avant reconnexion…');
+                return;
+            }
             this.logger.warn('🔌 Déconnecté du vocal, reconnexion…');
             try {
                 await Promise.race([
@@ -87,7 +91,7 @@ class Forwarder {
                     entersState(this.connection, VoiceConnectionStatus.Connecting, 5_000)
                 ]);
             } catch {
-                try { this.connection.destroy(); } catch {}
+                try { this.manualDisconnect = true; this.connection.destroy(); } catch {}
                 await this.connectToVoice();
                 return;
             }
@@ -112,6 +116,8 @@ class Forwarder {
     startAutoReconnect() {
         if (this.reconnectInterval) clearInterval(this.reconnectInterval);
         this.reconnectInterval = setInterval(async () => {
+            const now = Date.now();
+            if (this.reconnectBlockedUntil && now < this.reconnectBlockedUntil) return;
             const needsReconnect = !this.connection ||
                 this.connection.state.status === VoiceConnectionStatus.Destroyed ||
                 (this.connection.joinConfig && this.connection.joinConfig.channelId !== this.args.channelId);
@@ -119,7 +125,7 @@ class Forwarder {
                 this.logger.warn('🔄 Reconnexion automatique au salon vocal…');
                 try {
                     if (this.connection) {
-                        try { this.connection.destroy(); } catch {}
+                        try { this.manualDisconnect = true; this.connection.destroy(); } catch {}
                     }
                     await this.connectToVoice();
                 } catch (err) {
@@ -141,7 +147,7 @@ class Forwarder {
     close() {
         if (this.receiver) this.receiver.close();
         if (this.ffmpeg) this.ffmpeg.close();
-        if (this.connection) this.connection.destroy();
+        if (this.connection) { this.manualDisconnect = true; this.connection.destroy(); }
         if (this.client) this.client.destroy();
         if (this.reconnectInterval) clearInterval(this.reconnectInterval);
     }
