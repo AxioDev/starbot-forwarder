@@ -74,7 +74,7 @@ class Forwarder {
             channelId: channel.id,
             guildId: channel.guild.id,
             adapterCreator: channel.guild.voiceAdapterCreator,
-            selfMute: false,
+            selfMute: true,
             selfDeaf: false
         });
         this.connection.subscribe(this.audioPlayer);
