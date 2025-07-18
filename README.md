@@ -1,7 +1,7 @@
 
 This Discord bot captures audio from a voice channel and forwards it to an Icecast server. Multiple users can speak at the same time: the audio is automatically mixed.
 
-## Usage
+## Usage 
 
 ```bash
 node index.js -t <token> -c <voice_channel_id> <icecast_url>
