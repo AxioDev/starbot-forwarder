@@ -17,7 +17,11 @@
     <div class="space-x-4">
       <button id="start" class="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded">Parler</button>
       <button id="stop" class="px-4 py-2 bg-gray-700 text-white rounded opacity-50 cursor-not-allowed" disabled>Stop</button>
+    </div>
 
+    <div id="error-container" class="mt-6 text-left hidden">
+      <h2 class="text-lg mb-2 text-red-400">Erreurs</h2>
+      <div id="error-log" class="max-h-48 overflow-y-auto space-y-2"></div>
     </div>
   </div>
   <script src="app.js"></script>
