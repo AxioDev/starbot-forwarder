@@ -8,12 +8,14 @@ class AudioReceiver {
    * @param {number} inputSampleRate
    * @param {import('winston').Logger} logger
    * @param {{ wsUrl: string, sampleRate: number, language?: string }|null} kaldiConfig
+   * @param {import('./transcriptionStore').TranscriptionStore|null} transcriptionStore
    */
-  constructor(ffmpegInstance, inputSampleRate, logger, kaldiConfig) {
+  constructor(ffmpegInstance, inputSampleRate, logger, kaldiConfig, transcriptionStore) {
     this.ffmpeg = ffmpegInstance;
     this.logger = logger;
     this.inputSampleRate = inputSampleRate;
     this.kaldiConfig = kaldiConfig && kaldiConfig.wsUrl ? kaldiConfig : null;
+    this.transcriptionStore = transcriptionStore || null;
 
     // Mixer pour combiner les flux de plusieurs utilisateurs
     this.mixer = new AudioMixer.Mixer({
@@ -60,7 +62,7 @@ class AudioReceiver {
     let kaldiStream = null;
     if (this.kaldiConfig) {
       try {
-        kaldiStream = new KaldiStream(userId, this.kaldiConfig, this.logger);
+        kaldiStream = new KaldiStream(userId, this.kaldiConfig, this.logger, this.transcriptionStore);
         this.kaldiStreams.set(userId, kaldiStream);
       } catch (err) {
         this.logger.error(`Kaldi stream creation failed for ${userId}: ${err.message}`);

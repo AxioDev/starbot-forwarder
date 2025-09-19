@@ -99,7 +99,7 @@ class Forwarder {
 
         if (!this.receiver) {
             // créé un AudioReceiver qui enverra tout dans ffmpeg et vers Kaldi
-            this.receiver = new AudioReceiver(this.ffmpeg, 48000, this.logger, this.args.kaldi);
+            this.receiver = new AudioReceiver(this.ffmpeg, 48000, this.logger, this.args.kaldi, this.args.transcriptionStore || null);
         }
 
         // à chaque fois qu’un user parle, on pipe son flux Opus vers notre décodeur
