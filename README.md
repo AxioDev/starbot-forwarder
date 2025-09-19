@@ -52,11 +52,11 @@ node index.js --min-bitrate 2 --token YOUR_TOKEN --channel-id VOICE_CHANNEL_ID i
 ## Transcription temps réel via Kaldi
 
 Chaque participant est maintenant retranscrit en temps réel via WebSocket vers un
-serveur Kaldi (par défaut `ws://kaldiws.internal/client/ws/speech`). Utilisez les
+serveur Kaldi (par défaut `ws://kaldiws.internal:2700/client/ws/speech`). Utilisez les
 options suivantes pour personnaliser ou désactiver cette fonctionnalité :
 
 ```bash
-node index.js --kaldi-ws ws://kaldiws.internal/client/ws/speech \
+node index.js --kaldi-ws ws://kaldiws.internal:2700/client/ws/speech \
   --kaldi-sample-rate 16000 \
   --kaldi-language fr-FR \
   -t YOUR_TOKEN -c VOICE_CHANNEL_ID icecast://source:password@example.org:8000/stream
