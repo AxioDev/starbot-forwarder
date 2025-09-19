@@ -6,7 +6,10 @@ const http = require('http');
 const https = require('https');
 const Forwarder = require('./forwarder');
 const getVersion = require('./version');
-const startWebServer = require("./webServer");
+const startWebServer = require('./webServer');
+const { createTranscriptionStore } = require('./transcriptionStore');
+
+const envFlag = value => typeof value === 'string' && ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
 
 program
     .name('node index.js')
@@ -17,7 +20,7 @@ program
     .option('-r, --sample-rate <rate>', 'Sample rate de sortie (défaut 44100)', '44100')
     .option('-x, --compression-level <level>', 'Niveau de compression (défaut 0)', '0')
     .option('--min-bitrate <kbit>', 'Bitrate minimal pour l\'encodage MP3 en kb/s (défaut 1)')
-    .option('-d, --redirect-ffmpeg-output', 'Afficher stdout de ffmpeg')
+    .option('-d, --redirect-ffmpeg-output', 'Afficher la sortie de ffmpeg dans la console')
     .option('-l, --listening-to <text>', 'Activité “Listening to” (défaut “you.”)', 'you.')
     .option('-v, --volume <multiplier>', 'Multiplicateur de volume (défaut 3)', process.env.VOLUME || '3')
     .option('--railway-token <token>', 'Token API Railway', process.env.RAILWAY_TOKEN)
@@ -28,8 +31,10 @@ program
     .option('--web-port <port>', 'Port du serveur web (défaut 3000)', process.env.WEB_PORT || '3000')
     .option('--kaldi-ws <url>', 'URL du serveur Kaldi WebSocket (défaut ws://kaldiws.internal/client/ws/speech)')
     .option('--kaldi-sample-rate <hz>', 'Sample rate à envoyer à Kaldi (défaut 16000)')
-    .option('--kaldi-language <lang>', 'Langue à annoncer au serveur Kaldi (optionnel)')
+    .option('--kaldi-language <lang>', 'Langue à annoncer au serveur Kaldi (défaut fr-FR)')
     .option('--kaldi-disable', 'Désactive la retranscription Kaldi')
+    .option('--pg-url <url>', 'URL de connexion Postgres', process.env.POSTGRES_URL || process.env.DATABASE_URL)
+    .option('--pg-ssl', 'Active SSL pour la connexion Postgres')
     .argument('[icecastUrl]', 'URL Icecast de destination')
     .argument('[fileOutput]', 'Chemin de fichier local en alternative')
     .parse(process.argv);
@@ -41,7 +46,9 @@ let kaldiSampleRate = parseInt(opts.kaldiSampleRate || process.env.KALDI_SAMPLE_
 if (!Number.isFinite(kaldiSampleRate) || kaldiSampleRate <= 0) {
     kaldiSampleRate = 16000;
 }
-const kaldiLanguage = opts.kaldiLanguage || process.env.KALDI_LANGUAGE;
+const kaldiLanguage = opts.kaldiLanguage || process.env.KALDI_LANGUAGE || 'fr-FR';
+const pgUrl = opts.pgUrl || process.env.POSTGRES_URL || process.env.DATABASE_URL;
+const pgSsl = Boolean(opts.pgSsl || envFlag(process.env.POSTGRES_SSL) || envFlag(process.env.PGSSL) || envFlag(process.env.PG_SSL));
 let [icecastUrl, fileOutput] = program.args;
 if (!icecastUrl) {
     icecastUrl = process.env.ICECAST_URL;
@@ -71,8 +78,9 @@ const args = {
     kaldi: kaldiWsUrl ? {
         wsUrl: kaldiWsUrl,
         sampleRate: kaldiSampleRate,
-        language: kaldiLanguage || undefined
+        language: kaldiLanguage
     } : null,
+    transcriptionStore: null,
     outputGroup: {
         icecastUrl,
         path: fileOutput || null
@@ -86,17 +94,29 @@ const args = {
 };
 
 let forwarder;
+let webServerController = null;
+
+function ensureWebServer() {
+    if (!webServerController && (args.web || args.transcriptionStore)) {
+        webServerController = startWebServer(forwarder, args.webPort, logger, {
+            enableWebClient: args.web,
+            transcriptionStore: args.transcriptionStore || null
+        });
+    } else if (webServerController) {
+        webServerController.updateForwarder(forwarder);
+    }
+}
 
 function startForwarder() {
     forwarder = new Forwarder(args, logger);
     logger.info('Forwarder démarré. CTRL-C pour quitter.');
+    ensureWebServer();
 }
 
 function restartForwarder() {
     logger.warn('Redémarrage du forwarder…');
     if (forwarder) forwarder.close();
     startForwarder();
-    if (args.web) startWebServer(forwarder, args.webPort, logger);
 }
 
 async function triggerRailwayRestart(cfg) {
@@ -148,13 +168,43 @@ function checkStream(url) {
     });
 }
 
-startForwarder();
-if (args.web) startWebServer(forwarder, args.webPort, logger);
+async function main() {
+    if (pgUrl) {
+        try {
+            const storeOptions = { connectionString: pgUrl };
+            if (pgSsl) {
+                storeOptions.ssl = { rejectUnauthorized: false };
+            }
+            args.transcriptionStore = await createTranscriptionStore(storeOptions, logger);
+        } catch (err) {
+            logger.error(`❌ Impossible d'initialiser Postgres: ${err.message}`);
+        }
+    } else {
+        logger.warn('⚠️ Aucune base Postgres configurée : les transcriptions ne seront pas stockées.');
+    }
+    startForwarder();
+}
+
+main().catch(err => {
+    logger.error(`❌ Erreur fatale lors du démarrage: ${err.message}`);
+    process.exit(1);
+});
 
 process.on('SIGINT', () => {
     logger.info('Arrêt en cours…');
     if (forwarder) forwarder.close();
-    process.exit(0);
+    const tasks = [];
+    if (webServerController) {
+        tasks.push(webServerController.close().catch(err => {
+            logger.error(`❌ Erreur lors de l'arrêt du serveur web: ${err.message}`);
+        }));
+    }
+    if (args.transcriptionStore) {
+        tasks.push(args.transcriptionStore.close().catch(err => {
+            logger.error(`❌ Erreur lors de la fermeture de Postgres: ${err.message}`);
+        }));
+    }
+    Promise.all(tasks).finally(() => process.exit(0));
 });
 
 setInterval(async () => {

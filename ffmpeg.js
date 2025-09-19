@@ -66,7 +66,7 @@ class FFMPEG extends EventEmitter {
       stdio: [
         'pipe',
         args.redirectFfmpegOutput ? 'inherit' : 'ignore',
-        'inherit'
+        args.redirectFfmpegOutput ? 'inherit' : 'ignore'
       ]
     });
 
