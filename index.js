@@ -29,7 +29,7 @@ program
     .option('--railway-service <id>', 'ID du service Railway', process.env.RAILWAY_SERVICE_ID)
     .option('--web', 'Expose une page web pour parler', process.env.WEB === 'true')
     .option('--web-port <port>', 'Port du serveur web (défaut 3000)', process.env.WEB_PORT || '3000')
-    .option('--kaldi-ws <url>', 'URL du serveur Kaldi WebSocket (défaut ws://kaldiws.internal/client/ws/speech)')
+    .option('--kaldi-ws <url>', 'URL du serveur Kaldi WebSocket (défaut ws://kaldiws.internal:2700/client/ws/speech)')
     .option('--kaldi-sample-rate <hz>', 'Sample rate à envoyer à Kaldi (défaut 16000)')
     .option('--kaldi-language <lang>', 'Langue à annoncer au serveur Kaldi (défaut fr-FR)')
     .option('--kaldi-disable', 'Désactive la retranscription Kaldi')
@@ -41,7 +41,7 @@ program
 
 const opts = program.opts();
 const kaldiDisabled = opts.kaldiDisable || process.env.KALDI_DISABLE === 'true';
-const kaldiWsUrl = kaldiDisabled ? null : (opts.kaldiWs || process.env.KALDI_WS_URL || 'ws://kaldiws.internal/client/ws/speech');
+const kaldiWsUrl = kaldiDisabled ? null : (opts.kaldiWs || process.env.KALDI_WS_URL || 'ws://kaldiws.internal:2700/client/ws/speech');
 let kaldiSampleRate = parseInt(opts.kaldiSampleRate || process.env.KALDI_SAMPLE_RATE || '16000', 10);
 if (!Number.isFinite(kaldiSampleRate) || kaldiSampleRate <= 0) {
     kaldiSampleRate = 16000;
