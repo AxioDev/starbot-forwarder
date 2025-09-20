@@ -3,7 +3,7 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 
 
-const { createAudioPlayer, createAudioResource, joinVoiceChannel, VoiceConnectionStatus, entersState, demuxProbe } = require('@discordjs/voice');
+const { createAudioPlayer, createAudioResource, joinVoiceChannel, VoiceConnectionStatus, entersState, demuxProbe, EndBehaviorType } = require('@discordjs/voice');
 const FFMPEG = require('./ffmpeg');
 const AudioReceiver = require('./audioReceiver');
 
@@ -114,7 +114,10 @@ class Forwarder {
         // à chaque fois qu’un user parle, on pipe son flux Opus vers notre décodeur
         this.connection.receiver.speaking.on('start', userId => {
             this.logger.debug(`User ${userId} a commencé à parler`);
-            const opusStream = this.connection.receiver.subscribe(userId, { mode: 'opus', end: { behavior: 'manual' } });
+            const opusStream = this.connection.receiver.subscribe(userId, {
+                mode: 'opus',
+                end: { behavior: EndBehaviorType.AfterSilence, duration: 800 }
+            });
             this.receiver.handleOpusStream(opusStream, userId);
         });
 
