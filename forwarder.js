@@ -1,6 +1,6 @@
 
 
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
 
 
 const { createAudioPlayer, createAudioResource, joinVoiceChannel, VoiceConnectionStatus, entersState, demuxProbe, EndBehaviorType } = require('@discordjs/voice');
@@ -23,6 +23,10 @@ class Forwarder {
         this.reconnectBlockedUntil = 0;
         this.manualDisconnect = false;
         this.audioPlayer = createAudioPlayer();
+        this.mode = typeof this.args.mode === 'string' ? this.args.mode.toLowerCase() : 'active';
+        if (!['active', 'inactive'].includes(this.mode)) {
+            this.mode = 'active';
+        }
 
         this.client = new Client({
             intents: [GatewayIntentBits.GuildVoiceStates]
@@ -30,6 +34,12 @@ class Forwarder {
 
         this.client.once('ready', async () => {
             this.logger.info(`✅ Connecté en tant que ${this.client.user.tag}`);
+            this.updatePresence();
+
+            if (this.isInactive()) {
+                this.logger.info('🤖 Mode inactif activé : aucune connexion vocale, aucun message ni commande ne seront traités et le spawn de poubelles est désactivé.');
+                return;
+            }
 
             try {
                 await this.connectToVoice();
@@ -40,6 +50,7 @@ class Forwarder {
         });
 
         this.client.on('voiceStateUpdate', async (oldState, newState) => {
+            if (this.isInactive()) return;
             if (newState.id !== this.client.user.id) return;
             if (newState.channelId === this.args.channelId) return;
             if (this.manualDisconnect) { this.manualDisconnect = false; return; }
@@ -61,7 +72,28 @@ class Forwarder {
         });
     }
 
+    isInactive() {
+        return this.mode === 'inactive';
+    }
+
+    updatePresence() {
+        if (!this.client?.user) return;
+        const presenceOptions = this.isInactive()
+            ? { status: 'idle', activities: [] }
+            : {
+                status: 'online',
+                activities: this.args.listeningTo ? [{ type: ActivityType.Listening, name: this.args.listeningTo }] : []
+            };
+        this.client.user.setPresence(presenceOptions).catch(err => {
+            this.logger.warn(`⚠️ Impossible de mettre à jour la présence Discord : ${err.message}`);
+        });
+    }
+
     async connectToVoice() {
+        if (this.isInactive()) {
+            this.logger.debug('Connexion vocale ignorée (mode inactif).');
+            return;
+        }
         this.logger.info('Connexion au canal vocal…');
         const channel = await this.client.channels.fetch(this.args.channelId);
         this.channel = channel;
@@ -123,8 +155,20 @@ class Forwarder {
     }
 
     startAutoReconnect() {
+        if (this.isInactive()) {
+            if (this.reconnectInterval) {
+                clearInterval(this.reconnectInterval);
+                this.reconnectInterval = null;
+            }
+            return;
+        }
         if (this.reconnectInterval) clearInterval(this.reconnectInterval);
         this.reconnectInterval = setInterval(async () => {
+            if (this.isInactive()) {
+                clearInterval(this.reconnectInterval);
+                this.reconnectInterval = null;
+                return;
+            }
             const now = Date.now();
             if (this.reconnectBlockedUntil && now < this.reconnectBlockedUntil) return;
             const needsReconnect = !this.connection ||
@@ -144,6 +188,13 @@ class Forwarder {
         }, 3000);
     }
     playStream(readable) {
+        if (this.isInactive()) {
+            this.logger.warn('Flux audio ignoré : le bot est en mode inactif.');
+            if (typeof readable?.destroy === 'function') {
+                readable.destroy();
+            }
+            return;
+        }
         demuxProbe(readable)
             .then(({ stream, type }) => {
                 const resource = createAudioResource(stream, { inputType: type });

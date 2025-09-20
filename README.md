@@ -34,6 +34,16 @@ By default, MP3 encoding is done at 44.1 kHz. If your Icecast server or player r
 node index.js --token YOUR_TOKEN --channel-id VOICE_CHANNEL_ID icecast://source:password@example.org:8000/stream
 ```
 
+### Mode inactif
+
+Ajoutez l’option `--mode inactive` (ou définissez `BOT_MODE=inactive`) pour que le bot reste connecté à Discord sans rejoindre le
+canal vocal ni traiter de commandes. Dans ce mode, aucun flux audio n’est transmis et les actions automatisées (comme le spawn de
+poubelles) sont désactivées.
+
+```bash
+node index.js --mode inactive --token YOUR_TOKEN --channel-id VOICE_CHANNEL_ID icecast://source:password@example.org:8000/stream
+```
+
 The audio volume is boosted to **300%** by default. Use `--volume` (or set
 `VOLUME` in your `.env` file) to adjust this multiplier:
 

@@ -35,6 +35,7 @@ program
     .option('--kaldi-disable', 'Désactive la retranscription Kaldi')
     .option('--pg-url <url>', 'URL de connexion Postgres', process.env.POSTGRES_URL || process.env.DATABASE_URL)
     .option('--pg-ssl', 'Active SSL pour la connexion Postgres')
+    .option('--mode <mode>', 'Mode du bot ("active" ou "inactive")', process.env.BOT_MODE)
     .argument('[icecastUrl]', 'URL Icecast de destination')
     .argument('[fileOutput]', 'Chemin de fichier local en alternative')
     .parse(process.argv);
@@ -49,6 +50,16 @@ if (!Number.isFinite(kaldiSampleRate) || kaldiSampleRate <= 0) {
 const kaldiLanguage = opts.kaldiLanguage || process.env.KALDI_LANGUAGE || 'fr-FR';
 const pgUrl = opts.pgUrl || process.env.POSTGRES_URL || process.env.DATABASE_URL;
 const pgSsl = Boolean(opts.pgSsl || envFlag(process.env.POSTGRES_SSL) || envFlag(process.env.PGSSL) || envFlag(process.env.PG_SSL));
+let botMode = opts.mode ?? process.env.BOT_MODE ?? 'active';
+if (typeof botMode !== 'string') {
+    botMode = 'active';
+}
+botMode = botMode.trim().toLowerCase();
+const allowedModes = new Set(['active', 'inactive']);
+if (!allowedModes.has(botMode)) {
+    console.error(`Mode du bot invalide: "${botMode}". Utilisez "active" ou "inactive".`);
+    process.exit(1);
+}
 let [icecastUrl, fileOutput] = program.args;
 if (!icecastUrl) {
     icecastUrl = process.env.ICECAST_URL;
@@ -81,6 +92,7 @@ const args = {
         language: kaldiLanguage
     } : null,
     transcriptionStore: null,
+    mode: botMode,
     outputGroup: {
         icecastUrl,
         path: fileOutput || null
@@ -109,7 +121,11 @@ function ensureWebServer() {
 
 function startForwarder() {
     forwarder = new Forwarder(args, logger);
-    logger.info('Forwarder démarré. CTRL-C pour quitter.');
+    if (args.mode === 'inactive') {
+        logger.info('Forwarder démarré en mode inactif. CTRL-C pour quitter.');
+    } else {
+        logger.info('Forwarder démarré. CTRL-C pour quitter.');
+    }
     ensureWebServer();
 }
 
@@ -208,6 +224,7 @@ process.on('SIGINT', () => {
 });
 
 setInterval(async () => {
+    if (args.mode === 'inactive') return;
     if (!args.outputGroup.icecastUrl) return;
     const url = args.outputGroup.icecastUrl.replace(/^icecast\+/, '');
     const status = await checkStream(url);
