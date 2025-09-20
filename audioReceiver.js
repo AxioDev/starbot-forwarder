@@ -9,13 +9,18 @@ class AudioReceiver {
    * @param {import('winston').Logger} logger
    * @param {{ wsUrl: string, sampleRate: number, language?: string }|null} kaldiConfig
    * @param {import('./transcriptionStore').TranscriptionStore|null} transcriptionStore
+   * @param {{ guildId?: string|null, channelId?: string|null }} [metadata]
    */
-  constructor(ffmpegInstance, inputSampleRate, logger, kaldiConfig, transcriptionStore) {
+  constructor(ffmpegInstance, inputSampleRate, logger, kaldiConfig, transcriptionStore, metadata = {}) {
     this.ffmpeg = ffmpegInstance;
     this.logger = logger;
     this.inputSampleRate = inputSampleRate;
     this.kaldiConfig = kaldiConfig && kaldiConfig.wsUrl ? kaldiConfig : null;
     this.transcriptionStore = transcriptionStore || null;
+    this.metadata = {
+      guildId: metadata?.guildId ?? null,
+      channelId: metadata?.channelId ?? null
+    };
 
     // Mixer pour combiner les flux de plusieurs utilisateurs
     this.mixer = new AudioMixer.Mixer({
@@ -62,7 +67,7 @@ class AudioReceiver {
     let kaldiStream = null;
     if (this.kaldiConfig) {
       try {
-        kaldiStream = new KaldiStream(userId, this.kaldiConfig, this.logger, this.transcriptionStore);
+        kaldiStream = new KaldiStream(userId, this.kaldiConfig, this.logger, this.transcriptionStore, this.getMetadata());
         this.kaldiStreams.set(userId, kaldiStream);
       } catch (err) {
         this.logger.error(`Kaldi stream creation failed for ${userId}: ${err.message}`);
@@ -101,6 +106,15 @@ class AudioReceiver {
 
     this.inputs.set(userId, { decoder, input });
 
+  }
+
+  getMetadata() {
+    return { ...this.metadata };
+  }
+
+  updateContext(guildId, channelId) {
+    this.metadata.guildId = guildId ?? null;
+    this.metadata.channelId = channelId ?? null;
   }
 
   /** Stoppe le générateur de bruit et nettoie le mixer */

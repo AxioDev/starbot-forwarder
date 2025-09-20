@@ -27,6 +27,8 @@ function startWebServer(forwarder, port, logger, options = {}) {
 
   const formatRows = rows => rows.map(item => ({
     userId: item.userId,
+    guildId: item.guildId,
+    channelId: item.channelId,
     transcript: item.transcript,
     confidence: item.confidence,
     createdAt: item.createdAt instanceof Date ? item.createdAt.toISOString() : new Date(item.createdAt).toISOString()
