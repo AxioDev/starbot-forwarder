@@ -56,7 +56,7 @@ function downsampleStereo(buffer, inputRate, outputRate) {
 }
 
 class KaldiStream {
-  constructor(userId, config, logger, transcriptionStore) {
+  constructor(userId, config, logger, transcriptionStore, metadata = {}) {
     this.userId = userId;
     this.logger = logger;
     this.config = {
@@ -68,6 +68,10 @@ class KaldiStream {
     this.closed = false;
     this.hasSentConfig = false;
     this.transcriptionStore = transcriptionStore || null;
+    this.metadata = {
+      guildId: metadata?.guildId ?? null,
+      channelId: metadata?.channelId ?? null
+    };
 
     this.ws = new WebSocket(this.config.wsUrl, {
       perMessageDeflate: false
@@ -181,7 +185,7 @@ class KaldiStream {
           this.logger.info(`📝 [Kaldi][${this.userId}] ${transcript}`);
           if (this.transcriptionStore && transcript.trim().length > 0) {
             const confidence = typeof hypothesis.confidence === 'number' ? hypothesis.confidence : null;
-            this.transcriptionStore.saveTranscription(this.userId, transcript, confidence).catch(err => {
+            this.transcriptionStore.saveTranscription(this.userId, transcript, confidence, this.metadata).catch(err => {
               this.logger.error(`❌ [Kaldi] Échec d'enregistrement de la transcription pour ${this.userId}: ${err.message}`);
             });
           }
