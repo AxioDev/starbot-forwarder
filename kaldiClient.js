@@ -178,12 +178,28 @@ class KaldiStream {
 
   handleMessage(data) {
     if (this.closed) return;
-    console.log('data', data);
-    if (typeof data !== 'string') {
+
+    let rawMessage = null;
+    if (typeof data === 'string') {
+      rawMessage = data;
+    } else if (Buffer.isBuffer(data)) {
+      rawMessage = data.toString('utf8');
+    } else if (typeof ArrayBuffer !== 'undefined' && data instanceof ArrayBuffer) {
+      rawMessage = Buffer.from(data).toString('utf8');
+    } else if (typeof ArrayBuffer !== 'undefined' && typeof ArrayBuffer.isView === 'function' && ArrayBuffer.isView(data)) {
+      rawMessage = Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString('utf8');
+    }
+
+    if (typeof rawMessage !== 'string') {
+      const type = data?.constructor?.name || typeof data;
+      this.logger.warn(`⚠️ [Kaldi] Message non-textuel reçu pour ${this.userId} (type: ${type})`);
       return;
     }
+
+    this.logger.debug(`📨 [Kaldi][${this.userId}] ${rawMessage}`);
+
     try {
-      const msg = JSON.parse(data);
+      const msg = JSON.parse(rawMessage);
       let transcript = null;
       let isFinal = false;
       let confidence = null;
@@ -222,7 +238,8 @@ class KaldiStream {
         this.logger.debug(`🗒️ [Kaldi][${this.userId}] ${trimmed}`);
       }
     } catch (err) {
-      this.logger.warn(`⚠️ [Kaldi] Message inattendu pour ${this.userId}: ${err.message}`);
+      const preview = rawMessage.length > 500 ? `${rawMessage.slice(0, 500)}…` : rawMessage;
+      this.logger.error(`❌ [Kaldi] Impossible de traiter un message pour ${this.userId}: ${err.message} | Contenu: ${preview}`);
     }
   }
 
