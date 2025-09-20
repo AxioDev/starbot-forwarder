@@ -114,10 +114,7 @@ class Forwarder {
         // à chaque fois qu’un user parle, on pipe son flux Opus vers notre décodeur
         this.connection.receiver.speaking.on('start', userId => {
             this.logger.debug(`User ${userId} a commencé à parler`);
-            const opusStream = this.connection.receiver.subscribe(userId, {
-                mode: 'opus',
-                end: { behavior: EndBehaviorType.AfterSilence, duration: 800 }
-            });
+            const opusStream = this.connection.receiver.subscribe(userId, { mode: 'opus', end: { behavior: 'manual' } });
             this.receiver.handleOpusStream(opusStream, userId);
         });
 
