@@ -118,9 +118,10 @@ class KaldiStream {
     if (this.closed) return;
     if (this.ws.readyState === WebSocket.OPEN) {
       if (type === 'binary') {
-        this.ws.send(payload);
+        const binaryPayload = Buffer.isBuffer(payload) ? payload : Buffer.from(payload);
+        this.ws.send(binaryPayload, { binary: true });
       } else {
-        this.ws.send(payload);
+        this.ws.send(String(payload), { binary: false });
       }
     } else if (this.ws.readyState === WebSocket.CONNECTING) {
       this.queue.push({ type, payload });
@@ -131,9 +132,10 @@ class KaldiStream {
     if (this.ws.readyState !== WebSocket.OPEN) return;
     for (const item of this.queue) {
       if (item.type === 'binary') {
-        this.ws.send(item.payload);
+        const binaryPayload = Buffer.isBuffer(item.payload) ? item.payload : Buffer.from(item.payload);
+        this.ws.send(binaryPayload, { binary: true });
       } else {
-        this.ws.send(item.payload);
+        this.ws.send(String(item.payload), { binary: false });
       }
     }
     this.queue = [];
@@ -141,7 +143,8 @@ class KaldiStream {
 
   sendAudio(buffer, inputSampleRate) {
     if (this.closed) return;
-    const pcm = downsampleStereo(buffer, inputSampleRate, this.config.sampleRate);
+    const sourceBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+    const pcm = downsampleStereo(sourceBuffer, inputSampleRate, this.config.sampleRate);
     if (pcm.length === 0) return;
     this.sendMessage('binary', pcm);
   }
