@@ -106,8 +106,10 @@ class KaldiStream {
     const message = JSON.stringify(payload);
     this.hasSentConfig = true;
     if (this.ws.readyState === WebSocket.OPEN) {
+        console.log(`🔁 [Kaldi] Envoi de la config `, message);
       this.ws.send(message);
     } else if (this.ws.readyState === WebSocket.CONNECTING) {
+      console.log(`🔁 [Kaldi] Envoi de la config2 `, message);
       this.queue.unshift({ type: 'text', payload: message });
     }
   }
@@ -173,6 +175,7 @@ class KaldiStream {
 
   handleMessage(data) {
     if (this.closed) return;
+    console.log('data', data);
     if (typeof data !== 'string') {
       return;
     }
