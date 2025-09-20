@@ -178,20 +178,42 @@ class KaldiStream {
     }
     try {
       const msg = JSON.parse(data);
-      if (msg?.result?.hypotheses?.length) {
+      let transcript = null;
+      let isFinal = false;
+      let confidence = null;
+
+      if (typeof msg.text === 'string') {
+        transcript = msg.text;
+        isFinal = true;
+      } else if (typeof msg.partial === 'string') {
+        transcript = msg.partial;
+      } else if (msg?.result?.hypotheses?.length) {
         const hypothesis = msg.result.hypotheses[0];
-        const transcript = hypothesis.transcript;
-        if (msg.result.final) {
-          this.logger.info(`📝 [Kaldi][${this.userId}] ${transcript}`);
-          if (this.transcriptionStore && transcript.trim().length > 0) {
-            const confidence = typeof hypothesis.confidence === 'number' ? hypothesis.confidence : null;
-            this.transcriptionStore.saveTranscription(this.userId, transcript, confidence, this.metadata).catch(err => {
-              this.logger.error(`❌ [Kaldi] Échec d'enregistrement de la transcription pour ${this.userId}: ${err.message}`);
-            });
-          }
-        } else {
-          this.logger.debug(`🗒️ [Kaldi][${this.userId}] ${hypothesis.transcript}`);
+        transcript = hypothesis.transcript;
+        confidence = typeof hypothesis.confidence === 'number' ? hypothesis.confidence : null;
+        isFinal = Boolean(msg.result.final);
+      } else {
+        return;
+      }
+
+      if (typeof transcript !== 'string') {
+        return;
+      }
+
+      const trimmed = transcript.trim();
+      if (!trimmed) {
+        return;
+      }
+
+      if (isFinal) {
+        this.logger.info(`📝 [Kaldi][${this.userId}] ${trimmed}`);
+        if (this.transcriptionStore) {
+          this.transcriptionStore.saveTranscription(this.userId, trimmed, confidence, this.metadata).catch(err => {
+            this.logger.error(`❌ [Kaldi] Échec d'enregistrement de la transcription pour ${this.userId}: ${err.message}`);
+          });
         }
+      } else {
+        this.logger.debug(`🗒️ [Kaldi][${this.userId}] ${trimmed}`);
       }
     } catch (err) {
       this.logger.warn(`⚠️ [Kaldi] Message inattendu pour ${this.userId}: ${err.message}`);
