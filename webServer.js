@@ -44,12 +44,12 @@ function startWebServer(forwarder, port, logger, options = {}) {
     createdAt: item.createdAt instanceof Date ? item.createdAt.toISOString() : new Date(item.createdAt).toISOString()
   }));
 
-  app.get('/api/voice-users', (req, res) => {
+  app.get('/api/voice-users', async (req, res) => {
     if (!currentForwarder || typeof currentForwarder.getConnectedUsers !== 'function') {
       return res.status(503).json({ error: 'Le forwarder n\'est pas prêt.' });
     }
     try {
-      const users = currentForwarder.getConnectedUsers();
+      const users = await currentForwarder.getConnectedUsers();
       res.json(users);
     } catch (err) {
       logger.error(`❌ [API] Impossible de récupérer les utilisateurs vocaux: ${err.message}`);
