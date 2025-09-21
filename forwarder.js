@@ -21,6 +21,8 @@ class Forwarder {
         this.channel = null;
         this.voiceUsers = new Map();
         this.voiceMemberFetchWarned = false;
+        this.lastVoiceStatesFetch = 0;
+        this.voiceStatesFetchWarned = false;
         this.reconnectInterval = null;
         this.reconnectBlockedUntil = 0;
         this.manualDisconnect = false;
@@ -181,6 +183,22 @@ class Forwarder {
         const previous = this.voiceUsers;
         const next = new Map();
         const processed = new Set();
+
+        const guildVoiceStates = channel.guild?.voiceStates || null;
+        const canFetchVoiceStates = guildVoiceStates && typeof guildVoiceStates.fetch === 'function';
+        const now = Date.now();
+        if (canFetchVoiceStates && (now - this.lastVoiceStatesFetch > 15000)) {
+            this.lastVoiceStatesFetch = now;
+            try {
+                await guildVoiceStates.fetch();
+                this.voiceStatesFetchWarned = false;
+            } catch (err) {
+                if (!this.voiceStatesFetchWarned) {
+                    this.logger?.warn?.(`⚠️ Impossible d'actualiser le cache des états vocaux: ${err.message}`);
+                    this.voiceStatesFetchWarned = true;
+                }
+            }
+        }
 
         if (channel.members && typeof channel.members.values === 'function') {
             for (const member of channel.members.values()) {
