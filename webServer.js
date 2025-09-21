@@ -34,6 +34,19 @@ function startWebServer(forwarder, port, logger, options = {}) {
     createdAt: item.createdAt instanceof Date ? item.createdAt.toISOString() : new Date(item.createdAt).toISOString()
   }));
 
+  app.get('/api/voice-users', (req, res) => {
+    if (!currentForwarder || typeof currentForwarder.getConnectedUsers !== 'function') {
+      return res.status(503).json({ error: 'Le forwarder n\'est pas prêt.' });
+    }
+    try {
+      const users = currentForwarder.getConnectedUsers();
+      res.json(users);
+    } catch (err) {
+      logger.error(`❌ [API] Impossible de récupérer les utilisateurs vocaux: ${err.message}`);
+      res.status(500).json({ error: 'Erreur interne lors de la récupération des utilisateurs vocaux.' });
+    }
+  });
+
   app.get('/api/transcriptions', async (req, res) => {
     if (!transcriptionStore) {
       return res.status(503).json({ error: 'Le stockage des transcriptions est désactivé.' });
