@@ -19,6 +19,8 @@ class Forwarder {
         this.receiver = null;
         this.connection = null;
         this.channel = null;
+        this.voiceUsers = new Map();
+        this.voiceMemberFetchWarned = false;
         this.reconnectInterval = null;
         this.reconnectBlockedUntil = 0;
         this.manualDisconnect = false;
@@ -40,20 +42,24 @@ class Forwarder {
         });
 
         this.client.on('voiceStateUpdate', async (oldState, newState) => {
-            if (newState.id !== this.client.user.id) return;
-            if (newState.channelId === this.args.channelId) return;
-            if (this.manualDisconnect) { this.manualDisconnect = false; return; }
+            if (newState.id === this.client.user.id) {
+                if (newState.channelId === this.args.channelId) return;
+                if (this.manualDisconnect) { this.manualDisconnect = false; return; }
 
-            if (oldState.channelId === this.args.channelId) {
-                this.reconnectBlockedUntil = Date.now() + 30 * 60 * 1000;
-                this.logger.warn('❌ Expulsé du vocal. Reconnexion prévue dans 30 minutes.');
-                try {
-                    if (this.connection) {
-                        this.manualDisconnect = true;
-                        this.connection.destroy();
-                    }
-                } catch {}
+                if (oldState.channelId === this.args.channelId) {
+                    this.reconnectBlockedUntil = Date.now() + 30 * 60 * 1000;
+                    this.logger.warn('❌ Expulsé du vocal. Reconnexion prévue dans 30 minutes.');
+                    try {
+                        if (this.connection) {
+                            this.manualDisconnect = true;
+                            this.connection.destroy();
+                        }
+                    } catch {}
+                }
+                return;
             }
+
+            this.handleVoiceUserUpdate(oldState, newState);
         });
 
         this.client.login(this.args.token).catch(err => {
@@ -78,6 +84,8 @@ class Forwarder {
             selfDeaf: false
         });
         this.connection.subscribe(this.audioPlayer);
+
+        this.refreshVoiceUsersFromChannel(channel);
 
         this.connection.on(VoiceConnectionStatus.Disconnected, async () => {
             if (this.reconnectBlockedUntil && Date.now() < this.reconnectBlockedUntil) {
@@ -116,6 +124,12 @@ class Forwarder {
             this.logger.debug(`User ${userId} a commencé à parler`);
             const opusStream = this.connection.receiver.subscribe(userId, { mode: 'opus', end: { behavior: 'manual' } });
             this.receiver.handleOpusStream(opusStream, userId);
+            this.updateSpeakingState(userId, true);
+        });
+
+        this.connection.receiver.speaking.on('end', userId => {
+            this.logger.debug(`User ${userId} a arrêté de parler`);
+            this.updateSpeakingState(userId, false);
         });
 
         this.logger.info('🔊 Canal vocal rejoint, forwarding actif.');
@@ -159,6 +173,108 @@ class Forwarder {
         if (this.connection) { this.manualDisconnect = true; this.connection.destroy(); }
         if (this.client) this.client.destroy();
         if (this.reconnectInterval) clearInterval(this.reconnectInterval);
+        this.voiceUsers.clear();
+    }
+
+    refreshVoiceUsersFromChannel(channel) {
+        if (!channel || typeof channel.members?.values !== 'function') return;
+        const previous = this.voiceUsers;
+        this.voiceUsers = new Map();
+        for (const member of channel.members.values()) {
+            const data = this.buildVoiceUserData(member, member.voice, previous.get(member.id));
+            if (data) {
+                this.voiceUsers.set(member.id, data);
+            }
+        }
+        this.voiceMemberFetchWarned = false;
+    }
+
+    buildVoiceUserData(member, voiceState, existingData = null) {
+        if (!member) return null;
+        const existing = existingData || this.voiceUsers.get(member.id) || {};
+        const state = voiceState || member.voice || null;
+        return {
+            id: member.id,
+            username: member.user.username,
+            nickname: member.nickname || null,
+            avatarUrl: member.displayAvatarURL({ size: 256 }),
+            microphone: {
+                local: Boolean(state?.selfMute),
+                server: Boolean(state?.mute)
+            },
+            headphones: {
+                local: Boolean(state?.selfDeaf),
+                server: Boolean(state?.deaf)
+            },
+            isSpeaking: Boolean(existing.isSpeaking)
+        };
+    }
+
+    upsertVoiceUser(member, voiceState) {
+        const existing = this.voiceUsers.get(member.id) || null;
+        const data = this.buildVoiceUserData(member, voiceState, existing);
+        if (!data) return;
+        this.voiceUsers.set(member.id, data);
+        this.voiceMemberFetchWarned = false;
+    }
+
+    async handleVoiceUserUpdate(oldState, newState) {
+        const wasInChannel = oldState?.channelId === this.args.channelId;
+        const isInChannel = newState?.channelId === this.args.channelId;
+
+        if (!wasInChannel && !isInChannel) return;
+
+        if (isInChannel) {
+            const member = newState.member;
+            if (member) {
+                this.upsertVoiceUser(member, newState);
+            } else {
+                try {
+                    const fetched = await newState.guild.members.fetch(newState.id);
+                    this.upsertVoiceUser(fetched, fetched.voice);
+                } catch (err) {
+                    if (!this.voiceMemberFetchWarned) {
+                        this.voiceMemberFetchWarned = true;
+                        this.logger.warn(`⚠️ Impossible de récupérer les informations vocales pour ${newState.id}: ${err.message}`);
+                    }
+                }
+            }
+        }
+
+        if (wasInChannel && !isInChannel) {
+            this.voiceUsers.delete(newState.id);
+        }
+    }
+
+    updateSpeakingState(userId, isSpeaking) {
+        const current = this.voiceUsers.get(userId);
+        if (current) {
+            this.voiceUsers.set(userId, { ...current, isSpeaking });
+            return;
+        }
+
+        if (!isSpeaking) return;
+        if (!this.channel || !this.channel.guild) return;
+
+        this.channel.guild.members.fetch(userId)
+            .then(member => {
+                if (!member || member.voice?.channelId !== this.args.channelId) return;
+                const data = this.buildVoiceUserData(member, member.voice);
+                if (!data) return;
+                data.isSpeaking = true;
+                this.voiceUsers.set(member.id, data);
+            })
+            .catch(() => {});
+    }
+
+    getConnectedUsers() {
+        return Array.from(this.voiceUsers.values()).sort((a, b) => {
+            const nameA = a.username || '';
+            const nameB = b.username || '';
+            const cmp = nameA.localeCompare(nameB);
+            if (cmp !== 0) return cmp;
+            return a.id.localeCompare(b.id);
+        });
     }
 }
 
