@@ -222,15 +222,27 @@ class Forwarder {
         const existing = existingData || this.voiceUsers.get(identifier) || {};
 
         const user = entity?.user || entity || voiceState?.member?.user || null;
-        const username = user?.globalName || user?.username || existing.username || null;
+        const fallbackMember = voiceState?.member || null;
+        const username = user?.globalName
+            || user?.username
+            || fallbackMember?.user?.globalName
+            || fallbackMember?.user?.username
+            || existing.username
+            || identifier;
         const nickname = typeof entity?.nickname !== 'undefined'
             ? entity.nickname
-            : (existing.nickname ?? null);
+            : (typeof fallbackMember?.nickname !== 'undefined'
+                ? fallbackMember.nickname
+                : (existing.nickname ?? null));
 
         let avatarUrl = existing.avatarUrl || null;
         const avatarOwner = entity && typeof entity.displayAvatarURL === 'function'
             ? entity
-            : (user && typeof user.displayAvatarURL === 'function' ? user : null);
+            : (user && typeof user.displayAvatarURL === 'function'
+                ? user
+                : (fallbackMember && typeof fallbackMember.displayAvatarURL === 'function'
+                    ? fallbackMember
+                    : null));
         if (avatarOwner) {
             avatarUrl = avatarOwner.displayAvatarURL({ size: 256 });
         }
@@ -270,8 +282,13 @@ class Forwarder {
 
     async createVoiceUserDataFromIds(userId, voiceState = null, existingData = null) {
         const user = await this.resolveUser(userId);
-        if (!user) return null;
-        return this.buildVoiceUserData(user, voiceState, existingData);
+        if (user) {
+            return this.buildVoiceUserData(user, voiceState, existingData);
+        }
+        if (voiceState) {
+            return this.buildVoiceUserData(null, voiceState, existingData);
+        }
+        return null;
     }
 
     async ensureVoiceUserFromState(voiceState) {
