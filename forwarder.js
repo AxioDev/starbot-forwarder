@@ -85,7 +85,7 @@ class Forwarder {
         });
         this.connection.subscribe(this.audioPlayer);
 
-        this.refreshVoiceUsersFromChannel(channel);
+        await this.refreshVoiceUsersFromChannel(channel);
 
         this.connection.on(VoiceConnectionStatus.Disconnected, async () => {
             if (this.reconnectBlockedUntil && Date.now() < this.reconnectBlockedUntil) {
@@ -176,45 +176,141 @@ class Forwarder {
         this.voiceUsers.clear();
     }
 
-    refreshVoiceUsersFromChannel(channel) {
-        if (!channel || typeof channel.members?.values !== 'function') return;
+    async refreshVoiceUsersFromChannel(channel) {
+        if (!channel) return;
         const previous = this.voiceUsers;
-        this.voiceUsers = new Map();
-        for (const member of channel.members.values()) {
-            const data = this.buildVoiceUserData(member, member.voice, previous.get(member.id));
-            if (data) {
-                this.voiceUsers.set(member.id, data);
+        const next = new Map();
+        const processed = new Set();
+
+        if (channel.members && typeof channel.members.values === 'function') {
+            for (const member of channel.members.values()) {
+                const data = this.buildVoiceUserData(member, member.voice, previous.get(member.id));
+                if (data) {
+                    next.set(member.id, data);
+                    processed.add(member.id);
+                }
             }
         }
+
+        const voiceStates = channel.guild && channel.guild.voiceStates && channel.guild.voiceStates.cache;
+        if (voiceStates && typeof voiceStates.values === 'function') {
+            for (const state of voiceStates.values()) {
+                if (state.channelId !== channel.id) continue;
+                if (processed.has(state.id)) continue;
+                const existing = previous.get(state.id) || null;
+                let data = null;
+                if (state.member) {
+                    data = this.buildVoiceUserData(state.member, state, existing);
+                } else {
+                    data = await this.createVoiceUserDataFromIds(state.id, state, existing);
+                }
+                if (data) {
+                    next.set(state.id, data);
+                    processed.add(state.id);
+                }
+            }
+        }
+
+        this.voiceUsers = next;
         this.voiceMemberFetchWarned = false;
     }
 
-    buildVoiceUserData(member, voiceState, existingData = null) {
-        if (!member) return null;
-        const existing = existingData || this.voiceUsers.get(member.id) || {};
-        const state = voiceState || member.voice || null;
+    buildVoiceUserData(entity, voiceState, existingData = null) {
+        if (!entity && !voiceState) return null;
+        const identifier = entity?.id || voiceState?.id || voiceState?.member?.id || null;
+        if (!identifier) return null;
+        const existing = existingData || this.voiceUsers.get(identifier) || {};
+
+        const user = entity?.user || entity || voiceState?.member?.user || null;
+        const username = user?.globalName || user?.username || existing.username || null;
+        const nickname = typeof entity?.nickname !== 'undefined'
+            ? entity.nickname
+            : (existing.nickname ?? null);
+
+        let avatarUrl = existing.avatarUrl || null;
+        const avatarOwner = entity && typeof entity.displayAvatarURL === 'function'
+            ? entity
+            : (user && typeof user.displayAvatarURL === 'function' ? user : null);
+        if (avatarOwner) {
+            avatarUrl = avatarOwner.displayAvatarURL({ size: 256 });
+        }
+
+        const state = voiceState || entity?.voice || null;
+        const microphone = {
+            local: state?.selfMute != null ? Boolean(state.selfMute) : Boolean(existing.microphone?.local),
+            server: state?.mute != null ? Boolean(state.mute) : Boolean(existing.microphone?.server)
+        };
+        const headphones = {
+            local: state?.selfDeaf != null ? Boolean(state.selfDeaf) : Boolean(existing.headphones?.local),
+            server: state?.deaf != null ? Boolean(state.deaf) : Boolean(existing.headphones?.server)
+        };
+
         return {
-            id: member.id,
-            username: member.user.username,
-            nickname: member.nickname || null,
-            avatarUrl: member.displayAvatarURL({ size: 256 }),
-            microphone: {
-                local: Boolean(state?.selfMute),
-                server: Boolean(state?.mute)
-            },
-            headphones: {
-                local: Boolean(state?.selfDeaf),
-                server: Boolean(state?.deaf)
-            },
+            id: identifier,
+            username,
+            nickname,
+            avatarUrl,
+            microphone,
+            headphones,
             isSpeaking: Boolean(existing.isSpeaking)
         };
     }
 
-    upsertVoiceUser(member, voiceState) {
-        const existing = this.voiceUsers.get(member.id) || null;
-        const data = this.buildVoiceUserData(member, voiceState, existing);
+    async resolveUser(userId) {
+        if (!userId) return null;
+        const cached = this.client?.users?.cache?.get?.(userId);
+        if (cached) return cached;
+        if (!this.client || !this.client.users) return null;
+        try {
+            return await this.client.users.fetch(userId);
+        } catch (err) {
+            return null;
+        }
+    }
+
+    async createVoiceUserDataFromIds(userId, voiceState = null, existingData = null) {
+        const user = await this.resolveUser(userId);
+        if (!user) return null;
+        return this.buildVoiceUserData(user, voiceState, existingData);
+    }
+
+    async ensureVoiceUserFromState(voiceState) {
+        if (!voiceState) return false;
+        const existing = this.voiceUsers.get(voiceState.id) || null;
+        if (voiceState.member) {
+            this.upsertVoiceUser(voiceState.member, voiceState);
+            return true;
+        }
+
+        let fetchError = null;
+        if (voiceState.guild?.members && typeof voiceState.guild.members.fetch === 'function') {
+            try {
+                const fetched = await voiceState.guild.members.fetch(voiceState.id);
+                this.upsertVoiceUser(fetched, fetched.voice);
+                return true;
+            } catch (err) {
+                fetchError = err;
+            }
+        } else {
+            fetchError = new Error('Guild introuvable');
+        }
+
+        const data = await this.createVoiceUserDataFromIds(voiceState.id, voiceState, existing);
+        if (data) {
+            this.voiceUsers.set(voiceState.id, data);
+            return true;
+        }
+
+        if (fetchError) throw fetchError;
+        return false;
+    }
+
+    upsertVoiceUser(entity, voiceState) {
+        const key = entity?.id || voiceState?.id;
+        const existing = key ? (this.voiceUsers.get(key) || null) : null;
+        const data = this.buildVoiceUserData(entity, voiceState, existing);
         if (!data) return;
-        this.voiceUsers.set(member.id, data);
+        this.voiceUsers.set(data.id, data);
         this.voiceMemberFetchWarned = false;
     }
 
@@ -225,24 +321,21 @@ class Forwarder {
         if (!wasInChannel && !isInChannel) return;
 
         if (isInChannel) {
-            const member = newState.member;
-            if (member) {
-                this.upsertVoiceUser(member, newState);
-            } else {
-                try {
-                    const fetched = await newState.guild.members.fetch(newState.id);
-                    this.upsertVoiceUser(fetched, fetched.voice);
-                } catch (err) {
-                    if (!this.voiceMemberFetchWarned) {
-                        this.voiceMemberFetchWarned = true;
-                        this.logger.warn(`⚠️ Impossible de récupérer les informations vocales pour ${newState.id}: ${err.message}`);
-                    }
+            try {
+                const updated = await this.ensureVoiceUserFromState(newState);
+                if (updated) {
+                    this.voiceMemberFetchWarned = false;
+                }
+            } catch (err) {
+                if (!this.voiceMemberFetchWarned) {
+                    this.voiceMemberFetchWarned = true;
+                    this.logger.warn(`⚠️ Impossible de récupérer les informations vocales pour ${newState?.id}: ${err.message}`);
                 }
             }
         }
 
         if (wasInChannel && !isInChannel) {
-            this.voiceUsers.delete(newState.id);
+            this.voiceUsers.delete(newState?.id);
         }
     }
 
@@ -264,7 +357,18 @@ class Forwarder {
                 data.isSpeaking = true;
                 this.voiceUsers.set(member.id, data);
             })
-            .catch(() => {});
+            .catch(async () => {
+                const voiceStates = this.channel.guild?.voiceStates;
+                const voiceStateCache = voiceStates?.cache;
+                const voiceState = voiceStateCache && typeof voiceStateCache.get === 'function'
+                    ? voiceStateCache.get(userId)
+                    : null;
+                const existing = this.voiceUsers.get(userId) || null;
+                const data = await this.createVoiceUserDataFromIds(userId, voiceState, existing);
+                if (!data) return;
+                data.isSpeaking = true;
+                this.voiceUsers.set(userId, data);
+            });
     }
 
     getConnectedUsers() {
