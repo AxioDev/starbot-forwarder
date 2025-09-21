@@ -388,7 +388,15 @@ class Forwarder {
             });
     }
 
-    getConnectedUsers() {
+    async getConnectedUsers() {
+        if (this.channel) {
+            try {
+                await this.refreshVoiceUsersFromChannel(this.channel);
+            } catch (err) {
+                this.logger?.warn?.(`⚠️ Impossible d'actualiser les utilisateurs vocaux: ${err.message}`);
+            }
+        }
+
         return Array.from(this.voiceUsers.values()).sort((a, b) => {
             const nameA = a.username || '';
             const nameB = b.username || '';
