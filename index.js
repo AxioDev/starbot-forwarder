@@ -35,6 +35,7 @@ program
     .option('--kaldi-disable', 'Désactive la retranscription Kaldi')
     .option('--pg-url <url>', 'URL de connexion Postgres', process.env.POSTGRES_URL || process.env.DATABASE_URL)
     .option('--pg-ssl', 'Active SSL pour la connexion Postgres')
+    .option('--no-api', 'Désactive l\'API HTTP')
     .argument('[icecastUrl]', 'URL Icecast de destination')
     .argument('[fileOutput]', 'Chemin de fichier local en alternative')
     .parse(process.argv);
@@ -75,6 +76,7 @@ const args = {
     listeningTo: opts.listeningTo,
     web: opts.web,
     webPort: parseInt(opts.webPort, 10),
+    api: opts.api !== false,
     kaldi: kaldiWsUrl ? {
         wsUrl: kaldiWsUrl,
         sampleRate: kaldiSampleRate,
@@ -97,10 +99,11 @@ let forwarder;
 let webServerController = null;
 
 function ensureWebServer() {
-    if (!webServerController && (args.web || args.transcriptionStore)) {
+    if (!webServerController && (args.api || args.web || args.transcriptionStore)) {
         webServerController = startWebServer(forwarder, args.webPort, logger, {
             enableWebClient: args.web,
-            transcriptionStore: args.transcriptionStore || null
+            transcriptionStore: args.transcriptionStore || null,
+            enableVoiceApi: args.api
         });
     } else if (webServerController) {
         webServerController.updateForwarder(forwarder);

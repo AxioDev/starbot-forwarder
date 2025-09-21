@@ -75,12 +75,17 @@ demande une connexion chiffrée. La table `voice_transcriptions` est créée
 automatiquement si elle n’existe pas.
 
 Une API REST est exposée sur le même port que l’interface web (ou sur `--web-port` si
-vous n’activez pas l’interface). Deux endpoints sont disponibles :
+vous n’activez pas l’interface). Les endpoints suivants sont disponibles :
 
+- `GET /api/voice-users` renvoie la liste actuelle des utilisateurs connectés au
+  salon vocal ciblé, avec leur état micro/casque et l’indication s’ils parlent.
 - `GET /api/transcriptions?limit=50` retourne les dernières transcriptions tous
   utilisateurs confondus (limite maximale : 200).
 - `GET /api/transcriptions/:userId?limit=50` renvoie les dernières transcriptions
   associées à un utilisateur précis.
+
+L’API est activée par défaut, mais vous pouvez la désactiver avec l’option
+`--no-api` si vous ne souhaitez exposer aucune route HTTP.
 
 The white-noise generator in `audioReceiver.js` writes very low-level samples
 (amplitude around `±100`). Adjust this constant if you need the noise to be
