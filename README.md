@@ -49,39 +49,6 @@ Use `--min-bitrate` to override this value if needed:
 node index.js --min-bitrate 2 --token YOUR_TOKEN --channel-id VOICE_CHANNEL_ID icecast://source:password@example.org:8000/stream
 ```
 
-## Transcription temps réel via Kaldi
-
-Chaque participant est maintenant retranscrit en temps réel via WebSocket vers un
-serveur Kaldi (par défaut `ws://kaldiws.internal:2700/client/ws/speech`). Utilisez les
-options suivantes pour personnaliser ou désactiver cette fonctionnalité :
-
-```bash
-node index.js --kaldi-ws ws://kaldiws.internal:2700/client/ws/speech \
-  --kaldi-sample-rate 16000 \
-  --kaldi-language fr-FR \
-  -t YOUR_TOKEN -c VOICE_CHANNEL_ID icecast://source:password@example.org:8000/stream
-```
-
-Ajoutez `--kaldi-disable` (ou la variable d’environnement `KALDI_DISABLE=true`)
-si vous ne souhaitez pas transmettre les flux audio vers Kaldi.
-
-### Stockage PostgreSQL des transcriptions
-
-Fournissez une URL de connexion PostgreSQL (`--pg-url` ou la variable d’environnement
-`POSTGRES_URL`/`DATABASE_URL`) pour que chaque transcription finale soit enregistrée
-avec l’identifiant Discord de l’utilisateur, le texte reconnu et un horodatage précis.
-Activez l’option `--pg-ssl` (ou définissez `POSTGRES_SSL=true`) si votre fournisseur
-demande une connexion chiffrée. La table `voice_transcriptions` est créée
-automatiquement si elle n’existe pas.
-
-Une API REST est exposée sur le même port que l’interface web (ou sur `--web-port` si
-vous n’activez pas l’interface). Deux endpoints sont disponibles :
-
-- `GET /api/transcriptions?limit=50` retourne les dernières transcriptions tous
-  utilisateurs confondus (limite maximale : 200).
-- `GET /api/transcriptions/:userId?limit=50` renvoie les dernières transcriptions
-  associées à un utilisateur précis.
-
 The white-noise generator in `audioReceiver.js` writes very low-level samples
 (amplitude around `±100`). Adjust this constant if you need the noise to be
 more or less audible.

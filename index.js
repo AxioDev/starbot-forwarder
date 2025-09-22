@@ -7,9 +7,6 @@ const https = require('https');
 const Forwarder = require('./forwarder');
 const getVersion = require('./version');
 const startWebServer = require('./webServer');
-const { createTranscriptionStore } = require('./transcriptionStore');
-
-const envFlag = value => typeof value === 'string' && ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
 
 program
     .name('node index.js')
@@ -29,26 +26,11 @@ program
     .option('--railway-service <id>', 'ID du service Railway', process.env.RAILWAY_SERVICE_ID)
     .option('--web', 'Expose une page web pour parler', process.env.WEB === 'true')
     .option('--web-port <port>', 'Port du serveur web (défaut 3000)', process.env.WEB_PORT || '3000')
-    .option('--kaldi-ws <url>', 'URL du serveur Kaldi WebSocket (défaut ws://kaldiws.internal:2700/client/ws/speech)')
-    .option('--kaldi-sample-rate <hz>', 'Sample rate à envoyer à Kaldi (défaut 16000)')
-    .option('--kaldi-language <lang>', 'Langue à annoncer au serveur Kaldi (défaut fr-FR)')
-    .option('--kaldi-disable', 'Désactive la retranscription Kaldi')
-    .option('--pg-url <url>', 'URL de connexion Postgres', process.env.POSTGRES_URL || process.env.DATABASE_URL)
-    .option('--pg-ssl', 'Active SSL pour la connexion Postgres')
     .argument('[icecastUrl]', 'URL Icecast de destination')
     .argument('[fileOutput]', 'Chemin de fichier local en alternative')
     .parse(process.argv);
 
 const opts = program.opts();
-const kaldiDisabled = opts.kaldiDisable || process.env.KALDI_DISABLE === 'true';
-const kaldiWsUrl = kaldiDisabled ? null : (opts.kaldiWs || process.env.KALDI_WS_URL || 'ws://kaldiws.internal:2700/client/ws/speech');
-let kaldiSampleRate = parseInt(opts.kaldiSampleRate || process.env.KALDI_SAMPLE_RATE || '16000', 10);
-if (!Number.isFinite(kaldiSampleRate) || kaldiSampleRate <= 0) {
-    kaldiSampleRate = 16000;
-}
-const kaldiLanguage = opts.kaldiLanguage || process.env.KALDI_LANGUAGE || 'fr-FR';
-const pgUrl = opts.pgUrl || process.env.POSTGRES_URL || process.env.DATABASE_URL;
-const pgSsl = Boolean(opts.pgSsl || envFlag(process.env.POSTGRES_SSL) || envFlag(process.env.PGSSL) || envFlag(process.env.PG_SSL));
 let [icecastUrl, fileOutput] = program.args;
 if (!icecastUrl) {
     icecastUrl = process.env.ICECAST_URL;
@@ -75,12 +57,6 @@ const args = {
     listeningTo: opts.listeningTo,
     web: opts.web,
     webPort: parseInt(opts.webPort, 10),
-    kaldi: kaldiWsUrl ? {
-        wsUrl: kaldiWsUrl,
-        sampleRate: kaldiSampleRate,
-        language: kaldiLanguage
-    } : null,
-    transcriptionStore: null,
     outputGroup: {
         icecastUrl,
         path: fileOutput || null
@@ -97,10 +73,9 @@ let forwarder;
 let webServerController = null;
 
 function ensureWebServer() {
-    if (!webServerController && (args.web || args.transcriptionStore)) {
+    if (!webServerController && args.web) {
         webServerController = startWebServer(forwarder, args.webPort, logger, {
-            enableWebClient: args.web,
-            transcriptionStore: args.transcriptionStore || null
+            enableWebClient: args.web
         });
     } else if (webServerController) {
         webServerController.updateForwarder(forwarder);
@@ -169,19 +144,6 @@ function checkStream(url) {
 }
 
 async function main() {
-    if (pgUrl) {
-        try {
-            const storeOptions = { connectionString: pgUrl };
-            if (pgSsl) {
-                storeOptions.ssl = { rejectUnauthorized: false };
-            }
-            args.transcriptionStore = await createTranscriptionStore(storeOptions, logger);
-        } catch (err) {
-            logger.error(`❌ Impossible d'initialiser Postgres: ${err.message}`);
-        }
-    } else {
-        logger.warn('⚠️ Aucune base Postgres configurée : les transcriptions ne seront pas stockées.');
-    }
     startForwarder();
 }
 
@@ -197,11 +159,6 @@ process.on('SIGINT', () => {
     if (webServerController) {
         tasks.push(webServerController.close().catch(err => {
             logger.error(`❌ Erreur lors de l'arrêt du serveur web: ${err.message}`);
-        }));
-    }
-    if (args.transcriptionStore) {
-        tasks.push(args.transcriptionStore.close().catch(err => {
-            logger.error(`❌ Erreur lors de la fermeture de Postgres: ${err.message}`);
         }));
     }
     Promise.all(tasks).finally(() => process.exit(0));
