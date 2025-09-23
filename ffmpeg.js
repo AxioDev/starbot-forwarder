@@ -1,14 +1,17 @@
 const { spawn } = require('child_process');
 const EventEmitter = require('events');
+const fs = require('fs');
+const ffmpegStatic = require('ffmpeg-static');
+const IcecastClient = require('./icecastClient');
 
 class FFMPEG extends EventEmitter {
   /**
    * @param {object} args
    * @param {number} args.sampleRate
-  * @param {number} args.compressionLevel
-  * @param {number} args.volume
-  * @param {number|null} [args.minBitrate]
-  * @param {boolean} args.redirectFfmpegOutput
+   * @param {number} args.compressionLevel
+   * @param {number} args.volume
+   * @param {number|null} [args.minBitrate]
+   * @param {boolean} args.redirectFfmpegOutput
    * @param {{ icecastUrl: string|null, path: string|null }} args.outputGroup
    * @param {import('winston').Logger} logger
    */
@@ -19,6 +22,27 @@ class FFMPEG extends EventEmitter {
     this.keepRunning = true;
     this.process = null;
     this.restartTimer = null;
+    this.encoderPath = ffmpegStatic || 'ffmpeg';
+    this.icecastClient = null;
+    this.fileStream = null;
+
+    if (args.outputGroup.icecastUrl) {
+      this.icecastClient = new IcecastClient(args.outputGroup.icecastUrl, this.logger, {
+        headers: {
+          'Ice-Name': 'Starbot Forwarder',
+          'Ice-Description': 'Discord relay'
+        }
+      });
+    }
+
+    if (args.outputGroup.path) {
+      this.fileStream = fs.createWriteStream(args.outputGroup.path);
+      this.fileStream.on('error', err => {
+        this.logger.error('Erreur lors de l\'écriture du fichier de sortie:', err);
+        this.fileStream = null;
+        this.logger.warn('Flux fichier désactivé après erreur.');
+      });
+    }
 
     this.spawnProcess();
   }
@@ -36,13 +60,14 @@ class FFMPEG extends EventEmitter {
     const args = this.args;
 
     const cmd = [
-      'ffmpeg', '-hide_banner',
+      this.encoderPath, '-hide_banner',
       '-f', 's16le', '-ac', '2', '-ar', '48000', '-i', 'pipe:0',
       '-filter:a', `volume=${args.volume}`,
       '-ar', String(args.sampleRate),
       '-ac', '2',
       '-c:a', 'libmp3lame',
-      '-f', 'mp3'
+      '-f', 'mp3',
+      'pipe:1'
     ];
 
     if (args.minBitrate) {
@@ -53,22 +78,7 @@ class FFMPEG extends EventEmitter {
       cmd.push('-b:a', `${args.compressionLevel}k`);
     }
 
-    if (args.outputGroup.icecastUrl) {
-      let url = args.outputGroup.icecastUrl;
-      if (/^https?:\/\//.test(url) && !url.startsWith('icecast+')) {
-        url = 'icecast+' + url;
-      }
-      cmd.push(
-        '-reconnect_at_eof', '1',
-        '-reconnect_streamed',  '1',
-        '-reconnect',          '1',
-        '-reconnect_delay_max','1000',
-        '-content_type',       'audio/mpeg',
-        url
-      );
-    } else if (args.outputGroup.path) {
-      cmd.push(args.outputGroup.path);
-    } else {
+    if (!this.icecastClient && !this.fileStream) {
       throw new Error('Aucun output spécifié.');
     }
 
@@ -76,12 +86,34 @@ class FFMPEG extends EventEmitter {
     const child = spawn(cmd[0], cmd.slice(1), {
       stdio: [
         'pipe',
-        args.redirectFfmpegOutput ? 'inherit' : 'ignore',
-        'inherit'
+        'pipe',
+        'pipe'
       ]
     });
 
     this.process = child;
+
+    if (child.stdout) {
+      child.stdout.on('data', chunk => {
+        if (this.icecastClient) {
+          this.icecastClient.write(chunk);
+        }
+        if (this.fileStream) {
+          this.fileStream.write(chunk);
+        }
+      });
+      child.stdout.on('error', err => {
+        this.logger.error('Erreur sur stdout de ffmpeg:', err);
+      });
+    }
+
+    if (child.stderr) {
+      if (args.redirectFfmpegOutput) {
+        child.stderr.pipe(process.stderr);
+      } else {
+        child.stderr.resume();
+      }
+    }
 
     // 1) Éviter le crash sur EPIPE
     child.stdin.on('error', err => {
@@ -153,6 +185,14 @@ class FFMPEG extends EventEmitter {
       this.process.stdin.end();
       this.process.kill('SIGTERM');
       this.process = null;
+    }
+    if (this.icecastClient) {
+      this.icecastClient.close();
+      this.icecastClient = null;
+    }
+    if (this.fileStream) {
+      this.fileStream.end();
+      this.fileStream = null;
     }
   }
 }
