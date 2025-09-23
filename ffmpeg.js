@@ -17,11 +17,22 @@ class FFMPEG extends EventEmitter {
     this.logger = logger;
     this.args = args;
     this.keepRunning = true;
+    this.process = null;
+    this.restartTimer = null;
 
     this.spawnProcess();
   }
 
   spawnProcess() {
+    if (!this.keepRunning) {
+      return;
+    }
+
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+      this.restartTimer = null;
+    }
+
     const args = this.args;
 
     const cmd = [
@@ -62,7 +73,7 @@ class FFMPEG extends EventEmitter {
     }
 
     // Démarrage du process
-    this.process = spawn(cmd[0], cmd.slice(1), {
+    const child = spawn(cmd[0], cmd.slice(1), {
       stdio: [
         'pipe',
         args.redirectFfmpegOutput ? 'inherit' : 'ignore',
@@ -70,8 +81,10 @@ class FFMPEG extends EventEmitter {
       ]
     });
 
+    this.process = child;
+
     // 1) Éviter le crash sur EPIPE
-    this.process.stdin.on('error', err => {
+    child.stdin.on('error', err => {
       if (err.code === 'EPIPE') {
         this.logger.warn('ffmpeg stdin: broken pipe (EPIPE), on ignore.');
       } else {
@@ -80,15 +93,19 @@ class FFMPEG extends EventEmitter {
     });
 
     // 2) Log quand ffmpeg se ferme et redémarrer si nécessaire
-    this.process.on('close', (code, signal) => {
+    child.on('close', (code, signal) => {
       this.logger.warn(`ffmpeg process closed (code=${code}, signal=${signal})`);
+      this.process = null;
       if (this.keepRunning) {
-        setTimeout(() => this.spawnProcess(), 1000);
+        this.restartTimer = setTimeout(() => {
+          this.restartTimer = null;
+          this.spawnProcess();
+        }, 1000);
       }
     });
 
     // 3) Rethrow sur échec de spawn
-    this.process.on('error', err => {
+    child.on('error', err => {
       this.logger.error('Erreur lors du démarrage de ffmpeg:', err);
       throw err;
     });
@@ -99,19 +116,43 @@ class FFMPEG extends EventEmitter {
    * @param {Buffer} buffer
    */
   giveAudio(buffer) {
-    const ok = this.process.stdin.write(buffer);
-    if (!ok) {
-      this.logger.debug('ffmpeg stdin buffer plein (backpressure)');
+    if (!this.process || !this.process.stdin || this.process.killed) {
+      this.logger.debug('ffmpeg non disponible, paquet audio ignoré');
+      return;
+    }
+
+    const stdin = this.process.stdin;
+    if (stdin.destroyed || stdin.writableEnded || stdin.writableFinished) {
+      this.logger.debug('ffmpeg stdin fermé, paquet audio ignoré');
+      return;
+    }
+
+    try {
+      const ok = stdin.write(buffer);
+      if (!ok) {
+        this.logger.debug('ffmpeg stdin buffer plein (backpressure)');
+      }
+    } catch (err) {
+      if (err.code === 'ERR_STREAM_WRITE_AFTER_END' || err.code === 'ERR_STREAM_DESTROYED') {
+        this.logger.warn(`Impossible d\'écrire sur ffmpeg stdin (${err.code}), paquet audio perdu.`);
+      } else {
+        this.logger.error('Erreur inattendue lors de l\'écriture dans ffmpeg stdin:', err);
+      }
     }
   }
 
   /** Ferme proprement ffmpeg et stoppe le redémarrage auto */
   close() {
     this.keepRunning = false;
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+      this.restartTimer = null;
+    }
     if (this.process) {
       this.process.removeAllListeners('close');
       this.process.stdin.end();
       this.process.kill('SIGTERM');
+      this.process = null;
     }
   }
 }
