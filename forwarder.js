@@ -1,18 +1,16 @@
-
-
+const { EventEmitter } = require('events');
 const { Client, GatewayIntentBits } = require('discord.js');
-
-
 const { createAudioPlayer, createAudioResource, joinVoiceChannel, VoiceConnectionStatus, entersState, demuxProbe } = require('@discordjs/voice');
 const FFMPEG = require('./ffmpeg');
 const AudioReceiver = require('./audioReceiver');
 
-class Forwarder {
+class Forwarder extends EventEmitter {
     /**
      * @param {object} args - même structure que dans index.js
      * @param {winston.Logger} logger
      */
     constructor(args, logger) {
+        super();
         this.args = args;
         this.logger = logger;
         this.ffmpeg = null;
@@ -23,6 +21,7 @@ class Forwarder {
         this.reconnectBlockedUntil = 0;
         this.manualDisconnect = false;
         this.audioPlayer = createAudioPlayer();
+        this.currentSpeakers = new Set();
 
         this.client = new Client({
             intents: [GatewayIntentBits.GuildVoiceStates]
@@ -66,6 +65,13 @@ class Forwarder {
         const channel = await this.client.channels.fetch(this.args.channelId);
         this.channel = channel;
 
+        if (this.currentSpeakers.size > 0) {
+            for (const speakerId of this.currentSpeakers) {
+                this.emit('speakingStop', { id: speakerId });
+            }
+            this.currentSpeakers.clear();
+        }
+
         if (!this.ffmpeg) {
             this.ffmpeg = new FFMPEG(this.args, this.logger);
         }
@@ -107,6 +113,14 @@ class Forwarder {
             this.logger.debug(`User ${userId} a commencé à parler`);
             const opusStream = this.connection.receiver.subscribe(userId, { mode: 'opus', end: { behavior: 'manual' } });
             this.receiver.handleOpusStream(opusStream, userId);
+            this.handleSpeakingStart(userId);
+        });
+
+        this.connection.receiver.speaking.on('end', userId => {
+            this.logger.debug(`User ${userId} a arrêté de parler`);
+            if (this.currentSpeakers.delete(userId)) {
+                this.emit('speakingStop', { id: userId });
+            }
         });
 
         this.logger.info('🔊 Canal vocal rejoint, forwarding actif.');
@@ -141,6 +155,65 @@ class Forwarder {
                 this.audioPlayer.play(resource);
             })
             .catch(err => this.logger.error('Error probing audio stream:', err));
+    }
+
+    handleSpeakingStart(userId) {
+        if (this.currentSpeakers.has(userId)) {
+            return;
+        }
+
+        this.currentSpeakers.add(userId);
+        this.notifySpeakerStart(userId).catch(error => {
+            this.logger.debug(`Impossible de récupérer les informations de l'utilisateur ${userId}: ${error.message}`);
+            this.emit('speakingStart', {
+                id: userId,
+                displayName: `Intervenant ${userId.slice(-4)}`,
+                avatarUrl: undefined,
+                startedAt: Date.now()
+            });
+        });
+    }
+
+    async notifySpeakerStart(userId) {
+        const payload = {
+            id: userId,
+            displayName: `Intervenant ${userId.slice(-4)}`,
+            avatarUrl: undefined,
+            startedAt: Date.now()
+        };
+
+        try {
+            const member = await this.fetchGuildMember(userId);
+            if (member) {
+                payload.displayName = member.displayName || member.nickname || member.user?.username || payload.displayName;
+                if (member.user && typeof member.user.displayAvatarURL === 'function') {
+                    payload.avatarUrl = member.user.displayAvatarURL({ extension: 'png', size: 128 });
+                }
+            } else {
+                const user = await this.client.users.fetch(userId).catch(() => null);
+                if (user) {
+                    payload.displayName = user.username || payload.displayName;
+                    if (typeof user.displayAvatarURL === 'function') {
+                        payload.avatarUrl = user.displayAvatarURL({ extension: 'png', size: 128 });
+                    }
+                }
+            }
+        } catch (error) {
+            this.logger.debug(`Erreur lors de la récupération de l'utilisateur ${userId}: ${error.message}`);
+        }
+
+        this.emit('speakingStart', payload);
+    }
+
+    async fetchGuildMember(userId) {
+        try {
+            if (this.channel && this.channel.guild && this.channel.guild.members) {
+                return await this.channel.guild.members.fetch(userId);
+            }
+        } catch (error) {
+            this.logger.debug(`Impossible de récupérer le membre ${userId}: ${error.message}`);
+        }
+        return null;
     }
 
 

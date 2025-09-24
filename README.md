@@ -1,5 +1,5 @@
 
-This Discord bot captures audio from a voice channel and forwards it to an Icecast server. Multiple users can speak at the same time: the audio is automatically mixed. If the bot is kicked from the voice channel, it will reconnect automatically after **30&nbsp;minutes**.
+This Discord bot captures audio from a voice channel and forwards it to an Icecast server. Multiple users can speak at the same time: the audio is automatically mixed. If the bot is kicked from the voice channel, it will reconnect automatically after **30 minutes**.
 
 ## Usage 
 
@@ -42,7 +42,7 @@ node index.js --volume 1.5 --token YOUR_TOKEN --channel-id VOICE_CHANNEL_ID icec
 ```
 
 To avoid Icecast closing the connection during silence, a small white-noise bed
-is mixed in and a minimal bitrate of **1&nbsp;kbit/s** is enforced by default.
+is mixed in and a minimal bitrate of **1 kbit/s** is enforced by default.
 Use `--min-bitrate` to override this value if needed:
 
 ```bash
